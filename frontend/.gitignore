@@ -1,0 +1,10 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+temp-dist
+*.local
+.idea
+.env
+typed-router.d.ts
+components.d.ts
