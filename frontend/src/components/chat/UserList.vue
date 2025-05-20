@@ -13,7 +13,7 @@
         <li v-for="user in onlineUsers" :key="user.id" class="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors duration-150">
           <span class="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></span>
           <span class="text-gray-700 dark:text-gray-300 font-medium">{{ user.username }}</span>
-          <span v-if="user.is_typing" class="ml-2 text-gray-500 text-xs italic">
+          <span v-if="isUserTyping(user.id)" class="ml-2 text-gray-500 text-xs italic">
             typing<span class="typing-animation">...</span>
           </span>
         </li>
@@ -67,6 +67,10 @@ export default {
     }
   },
   methods: {
+    isUserTyping(userId) {
+      // Safely check if user is typing
+      return userId && this.typingUsers[userId] === true;
+    },
     userStartedTyping(userId) {
       if (!userId) return;
 
