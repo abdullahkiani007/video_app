@@ -4,3 +4,5 @@ backend/venv
 .cursor
 __pycache__/
 *.pyc
+
+backend/db.sqlite3

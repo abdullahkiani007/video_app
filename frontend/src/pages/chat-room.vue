@@ -8,7 +8,17 @@
           :remoteStreams="remoteStreams"
           :users="users"
           :currentUserId="userId"
-        />
+        >
+          <div v-for="(stream, userId) in remoteStreams" :key="userId" class="remote-video-container">
+            <video
+              :ref="el => { if (el) remoteVideoRefs[userId] = el }"
+              autoplay
+              playsinline
+              class="remote-video"
+            ></video>
+            <div class="user-label">{{ getUsernameById(userId) }}</div>
+          </div>
+        </VideoGrid>
       </div>
       <div v-else class="flex items-center justify-center h-full">
         <p class="text-white text-xl text-center px-4">Join the call to start video chat</p>
@@ -162,7 +172,9 @@ export default {
       resizing: null,
       minSidebarWidth: 250,
       maxSidebarWidth: 600,
-      statusSocket: null
+      statusSocket: null,
+      streamCheckInterval: null,
+      remoteVideoRefs: {}
     }
   },
   created() {
@@ -182,7 +194,7 @@ export default {
     this.fetchUsers();
     this.fetchMessages();
     this.connectWebSocket();
-    this.connectStatusWebSocket();
+    // this.connectStatusWebSocket();
 
     // Check if device is mobile
     this.checkIfMobile();
@@ -195,6 +207,31 @@ export default {
     // Add global event listeners for resizing
     document.addEventListener('mousemove', this.handleResize);
     document.addEventListener('mouseup', this.stopResizing);
+
+    // Add interval to check remote streams
+    this.streamCheckInterval = setInterval(() => {
+      console.log("remote streams ", this.remoteStreams);
+      if (Object.keys(this.remoteStreams).length > 0) {
+        console.log('Remote streams available:', Object.keys(this.remoteStreams));
+        for (const userId in this.remoteStreams) {
+          const stream = this.remoteStreams[userId];
+          console.log(`Stream for user ${userId}:`, {
+            active: stream.active,
+            id: stream.id,
+            tracks: stream.getTracks().map(t => ({
+              kind: t.kind,
+              enabled: t.enabled,
+              muted: t.muted,
+              readyState: t.readyState
+            }))
+          });
+        }
+      }
+    }, 5000);
+
+    // Handle autoplay restrictions
+    document.addEventListener('click', this.handleUserInteraction, { once: true });
+    document.addEventListener('touchstart', this.handleUserInteraction, { once: true });
   },
   beforeUnmount() {
     this.leaveCall();
@@ -206,6 +243,11 @@ export default {
     // Remove global event listeners
     document.removeEventListener('mousemove', this.handleResize);
     document.removeEventListener('mouseup', this.stopResizing);
+
+    // Clear interval if it exists
+    if (this.streamCheckInterval) {
+      clearInterval(this.streamCheckInterval);
+    }
   },
   methods: {
     // New methods for sidebar functionality
@@ -449,14 +491,28 @@ export default {
           this.handleUserLeft(data.userId);
           break;
         case 'offer':
-          // Always handle offers
-          this.handleOffer(data);
+          // Only process offers meant for us
+          if (data.targetUserId === this.userId) {
+            this.handleOffer(data);
+          } else {
+            console.log(`Ignoring offer not meant for us (target: ${data.targetUserId})`);
+          }
           break;
         case 'answer':
-          this.handleAnswer(data);
+          // Only process answers meant for us
+          if (data.targetUserId === this.userId) {
+            this.handleAnswer(data);
+          } else {
+            console.log(`Ignoring answer not meant for us (target: ${data.targetUserId})`);
+          }
           break;
         case 'ice-candidate':
-          this.handleIceCandidate(data);
+          // Only process ICE candidates meant for us
+          if (data.targetUserId === this.userId) {
+            this.handleIceCandidate(data);
+          } else {
+            console.log(`Ignoring ICE candidate not meant for us (target: ${data.targetUserId})`);
+          }
           break;
         case 'user-left':
           this.handleUserLeft(data.userId);
@@ -622,13 +678,18 @@ export default {
         setTimeout(() => {
           // Find all users who are already in the call
           // We need to initiate connections to all users already in the call
-          const usersInCall = this.onlineUsers.filter(user =>
+          const usersInCall = this.users.filter(user =>
             user.inCall && user.userId !== this.userId
           );
+          console.log("usersInCall ", usersInCall);
+          console.log("this.users ", this.users);
+          console.log("this.userId ", this.userId);
+          console.log("this.peerConnections ", this.peerConnections);
 
           if (usersInCall.length > 0) {
             console.log(`Creating offers to ${usersInCall.length} users already in call`);
             usersInCall.forEach(user => {
+              console.log("user ", user);
               // Create peer connection if it doesn't exist
               if (!this.peerConnections[user.userId]) {
                 this.createPeerConnection(user.userId);
@@ -655,25 +716,32 @@ export default {
       }
 
       try {
-        // Create offer
-        const offer = await this.peerConnections[userId].createOffer({
-          offerToReceiveAudio: true,
-          offerToReceiveVideo: true
-        });
+        const pc = this.peerConnections[userId];
 
-        await this.peerConnections[userId].setLocalDescription(offer);
+        // Check if connection is in a valid state to create an offer
+        if (pc.signalingState === 'stable') {
+          // Create offer
+          const offer = await pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: true
+          });
 
-        // Send the offer to the remote peer
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-          this.socket.send(JSON.stringify({
-            type: 'offer',
-            userId: this.userId,
-            targetUserId: userId,
-            sdp: this.peerConnections[userId].localDescription
-          }));
-          console.log(`Sent offer to user ${userId}`);
+          await pc.setLocalDescription(offer);
+
+          // Send the offer to the remote peer
+          if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+              type: 'offer',
+              userId: this.userId,
+              targetUserId: userId,  // Make sure this is the correct recipient
+              sdp: pc.localDescription
+            }));
+            console.log(`Sent offer to user ${userId}`);
+          } else {
+            console.error('WebSocket not connected, cannot send offer');
+          }
         } else {
-          console.error('WebSocket not connected, cannot send offer');
+          console.warn(`Cannot create offer - peer connection is in ${pc.signalingState} state`);
         }
       } catch (error) {
         console.error(`Error creating offer to user ${userId}:`, error);
@@ -687,14 +755,16 @@ export default {
       const pc = new RTCPeerConnection({
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' }
+          // { urls: 'stun:stun1.l.google.com:19302' },
+          // { urls: 'stun:stun2.l.google.com:19302' },
+          // { urls: 'stun:stun3.l.google.com:19302' },
+          // { urls: 'stun:stun4.l.google.com:19302' }
         ]
       });
 
+
       this.peerConnections[remoteUserId] = pc;
+      console.log("pc ", pc);
 
       // Add all local tracks to the connection if we're in a call
       if (this.isInCall && this.localStream) {
@@ -708,12 +778,21 @@ export default {
         console.log('localStream exists:', !!this.localStream);
       }
 
+      console.log("pc after adding tracks", pc);
+
       // Handle incoming tracks
       pc.ontrack = (event) => {
         console.log(`Received track from ${remoteUserId}:`, event.track.kind);
 
+        // Ensure track is enabled
+        if (!event.track.enabled) {
+          console.log(`Enabling ${event.track.kind} track from ${remoteUserId}`);
+          event.track.enabled = true;
+        }
+
         // Create a new MediaStream if it doesn't exist for this user
         if (!this.remoteStreams[remoteUserId]) {
+          console.log("creating new remote stream for ", remoteUserId);
           this.remoteStreams[remoteUserId] = new MediaStream();
           // Force reactivity update
           this.remoteStreams = { ...this.remoteStreams };
@@ -727,10 +806,22 @@ export default {
 
         console.log(`Added ${event.track.kind} track to remote stream for ${remoteUserId}`);
         console.log(`Current remote streams:`, Object.keys(this.remoteStreams));
+
+        // Try to play the video immediately if element exists
+        this.$nextTick(() => {
+          const videoEl = this.remoteVideoRefs[remoteUserId];
+          if (videoEl) {
+            videoEl.srcObject = this.remoteStreams[remoteUserId];
+            videoEl.play().catch(err => {
+              console.warn(`Could not play remote video for ${remoteUserId}:`, err);
+            });
+          }
+        });
       };
 
       // Handle ICE candidates
       pc.onicecandidate = (event) => {
+        console.log("onicecandidate ", event);
         if (event.candidate) {
           console.log(`Generated ICE candidate for ${remoteUserId}`);
 
@@ -804,6 +895,7 @@ export default {
 
     async handleOffer(data) {
       try {
+        console.log("handleOffer ", data);
         // Extract the correct fields from the data
         const from = data.userId;
         const offer = data.sdp;
@@ -817,6 +909,7 @@ export default {
 
         // Create peer connection if it doesn't exist
         let pc = this.peerConnections[from];
+        console.log("pc ", pc);
         if (!pc) {
           console.log(`Creating new peer connection for offer from ${from}`);
           pc = this.createPeerConnection(from);
@@ -825,6 +918,10 @@ export default {
             return;
           }
         }
+
+        // Initialize pending candidates array if needed
+        if (!this._pendingCandidates) this._pendingCandidates = {};
+        if (!this._pendingCandidates[from]) this._pendingCandidates[from] = [];
 
         // Set remote description
         console.log(`Setting remote description for ${from}`);
@@ -867,12 +964,18 @@ export default {
         }
 
         // Apply any pending ICE candidates
-        if (this._pendingCandidates && this._pendingCandidates[from]) {
+        if (this._pendingCandidates[from] && this._pendingCandidates[from].length > 0) {
           console.log(`Applying ${this._pendingCandidates[from].length} pending ICE candidates for ${from}`);
           for (const candidate of this._pendingCandidates[from]) {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(candidate));
+              console.log(`Successfully added pending ICE candidate for ${from}`);
+            } catch (err) {
+              console.warn(`Failed to add pending ICE candidate for ${from}:`, err);
+            }
           }
-          delete this._pendingCandidates[from];
+          // Clear the pending candidates after applying them
+          this._pendingCandidates[from] = [];
         }
       } catch (error) {
         console.error('Error handling offer:', error);
@@ -908,12 +1011,24 @@ export default {
           if (this._pendingCandidates && this._pendingCandidates[from]) {
             console.log(`Applying ${this._pendingCandidates[from].length} pending ICE candidates for ${from}`);
             for (const candidate of this._pendingCandidates[from]) {
-              await pc.addIceCandidate(new RTCIceCandidate(candidate));
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                console.log(`Successfully added pending ICE candidate for ${from}`);
+              } catch (err) {
+                console.warn(`Failed to add pending ICE candidate for ${from}:`, err);
+              }
             }
-            delete this._pendingCandidates[from];
+            // Clear the pending candidates after applying them
+            this._pendingCandidates[from] = [];
           }
         } else {
-          console.error(`Cannot set remote description in state: ${pc.signalingState}`);
+          console.warn(`Cannot set remote description in state: ${pc.signalingState}`);
+
+          // If we're in stable state, we might have already processed this answer
+          // or there might be a race condition - log it but don't treat as error
+          if (pc.signalingState === 'stable') {
+            console.log(`Connection already stable with ${from}, ignoring duplicate answer`);
+          }
         }
       } catch (error) {
         console.error('Error handling answer:', error);
@@ -939,16 +1054,24 @@ export default {
           return;
         }
 
+        // Initialize pending candidates array if needed
+        if (!this._pendingCandidates) this._pendingCandidates = {};
+        if (!this._pendingCandidates[from]) this._pendingCandidates[from] = [];
+
         // Only add candidate if we have a remote description
         if (pc.remoteDescription && pc.remoteDescription.type) {
-          console.log(`Adding ICE candidate for ${from}`);
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-          console.log(`ICE candidate added for ${from}`);
+          try {
+            console.log(`Adding ICE candidate for ${from}`);
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            console.log(`ICE candidate added for ${from}`);
+          } catch (err) {
+            console.warn(`Failed to add ICE candidate for ${from}:`, err);
+            // Store failed candidates too, in case we need to retry
+            this._pendingCandidates[from].push(candidate);
+          }
         } else {
-          console.warn(`Skipping ICE candidate - no remote description for ${from} yet`);
+          console.warn(`Storing ICE candidate - no remote description for ${from} yet`);
           // Store candidates to add later
-          if (!this._pendingCandidates) this._pendingCandidates = {};
-          if (!this._pendingCandidates[from]) this._pendingCandidates[from] = [];
           this._pendingCandidates[from].push(candidate);
         }
       } catch (error) {
@@ -1005,29 +1128,27 @@ export default {
     },
 
     connectStatusWebSocket() {
-      // Close existing connection if any
-      if (this.statusSocket) {
-        this.statusSocket.close();
-      }
-
       try {
-        // Use the same WebSocket URL pattern as your working chat WebSocket
+        // Close existing connection if any
+        if (this.statusSocket) {
+          this.statusSocket.close();
+        }
+
+        // Get the base WebSocket URL from environment or use default
         const baseWsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+        // Connect to the user status endpoint
+        const wsUrl = `${baseWsUrl}/ws/user-status/`;
 
-        // IMPORTANT: Make sure this endpoint path matches exactly what your backend expects
-        // If your backend doesn't have a separate user-status endpoint, you might need to use the same endpoint
-        this.statusSocket = new WebSocket(`${baseWsUrl}/ws/user-status/`);
-
-        console.log(`Attempting to connect status WebSocket to: ${baseWsUrl}/ws/user-status/`);
+        console.log(`Connecting to status WebSocket at ${wsUrl}`);
+        this.statusSocket = new WebSocket(wsUrl);
 
         this.statusSocket.onopen = () => {
-          console.log('Status WebSocket connected successfully');
+          console.log('Status WebSocket connected');
         };
 
         this.statusSocket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log('Status WebSocket message received:', data);
             this.handleStatusMessage(data);
           } catch (error) {
             console.error('Error parsing status WebSocket message:', error);
@@ -1035,7 +1156,16 @@ export default {
         };
 
         this.statusSocket.onclose = (event) => {
-          console.log(`Status WebSocket disconnected: code=${event.code}, reason=${event.reason}`);
+          console.log(`Status WebSocket disconnected (code: ${event.code}, reason: ${event.reason})`);
+          // Try to reconnect after a delay, but only if not intentionally closed
+          if (event.code !== 1000) {
+            setTimeout(() => {
+              if (this.userId) {
+                console.log('Attempting to reconnect status WebSocket...');
+                // this.connectStatusWebSocket();
+              }
+            }, 5000); // 5 second delay before reconnecting
+          }
         };
 
         this.statusSocket.onerror = (error) => {
@@ -1043,6 +1173,13 @@ export default {
         };
       } catch (error) {
         console.error('Failed to connect status WebSocket:', error);
+        // Schedule retry
+        setTimeout(() => {
+          if (this.userId) {
+            console.log('Retrying status WebSocket connection...');
+            // this.connectStatusWebSocket();
+          }
+        }, 5000);
       }
     },
 
@@ -1093,22 +1230,61 @@ export default {
     },
 
     handleTyping(isTyping) {
-      const conversationId = 'global';
-      console.log(`Local user is ${isTyping ? 'typing' : 'stopped typing'}`);
+      // Get the current conversation ID
+      const conversationId = this.currentConversationId; // You'll need to track this
 
+      // Send typing status to WebSocket
+      this.sendTypingStatus(isTyping, conversationId);
+    },
 
-      // Always send through main chat WebSocket since we know it's working
-      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        console.log('Sending typing status through main chat WebSocket');
-        this.socket.send(JSON.stringify({
-          type: 'typing',
-          userId: this.userId,
-          username: this.username,
-          isTyping: isTyping
-        }));
-      } else {
+    getUsernameById(userId) {
+      const user = this.users.find(u => u.userId === parseInt(userId));
+      return user ? user.username : `User ${userId}`;
+    },
 
-        console.warn('Main chat WebSocket not connected, cannot send typing status');
+    handleUserInteraction() {
+      console.log('User interaction detected, attempting to play all videos');
+
+      // Try to play local video if it exists
+      if (this.$refs.localVideo && this.$refs.localVideo.paused) {
+        this.$refs.localVideo.play().catch(err => {
+          console.warn('Could not play local video:', err);
+        });
+      }
+
+      // Try to play all remote videos
+      for (const userId in this.remoteVideoRefs) {
+        const videoEl = this.remoteVideoRefs[userId];
+        if (videoEl && videoEl.paused) {
+          videoEl.play().catch(err => {
+            console.warn(`Could not play remote video for ${userId}:`, err);
+          });
+        }
+      }
+    }
+  },
+  watch: {
+    remoteStreams: {
+      deep: true,
+      handler(newStreams) {
+        console.log('Remote streams updated:', Object.keys(newStreams));
+        // Use nextTick to ensure DOM is updated
+        this.$nextTick(() => {
+          for (const userId in newStreams) {
+            const videoEl = this.remoteVideoRefs[userId];
+            const stream = newStreams[userId];
+
+            if (videoEl && stream && videoEl.srcObject !== stream) {
+              console.log(`Setting srcObject for user ${userId}`);
+              videoEl.srcObject = stream;
+
+              // Force play (might be needed for some browsers)
+              videoEl.play().catch(err => {
+                console.warn(`Could not play remote video for ${userId}:`, err);
+              });
+            }
+          }
+        });
       }
     }
   }

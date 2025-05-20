@@ -1,79 +1,86 @@
 <template>
-  <div class="video-grid">
-    <!-- No participants case - already handled in parent component -->
+  <div class="video-grid" :class="gridClass">
+    <!-- Debug info (remove in production) -->
+    <div v-if="false" class="debug-info">
+      Total participants: {{ totalParticipants }}<br>
+      Remote streams: {{ Object.keys(validRemoteStreams).join(', ') }}
+    </div>
 
-    <!-- Single participant case -->
-    <div v-if="totalParticipants === 1" class="single-participant-view">
-      <div v-if="localStream" class="video-wrapper">
+    <!-- Empty state - no participants -->
+    <div v-if="totalParticipants === 0" class="empty-state">
+      <p>No participants in the call</p>
+    </div>
+
+    <!-- Two-person call layout (1 local + 1 remote) -->
+    <div v-else-if="totalParticipants === 2 && localStream && Object.keys(validRemoteStreams).length === 1"
+         class="two-person-grid">
+      <!-- Local video -->
+      <div class="video-container relative local-video">
         <video
           ref="localVideo"
           :srcObject.prop="localStream"
           autoplay
-          muted
           playsinline
-          class="video-element"
+          muted
+          class="w-full h-full object-cover rounded-lg"
         ></video>
-        <div class="participant-label">
-          <span class="participant-name">You</span>
+        <div class="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-white text-sm">
+          You
         </div>
       </div>
-      <div v-else-if="Object.keys(validRemoteStreams).length === 1"
-           v-for="(stream, userId) in validRemoteStreams"
-           :key="userId"
-           class="video-wrapper">
+
+      <!-- Remote video (single participant) -->
+      <div
+        v-for="(stream, userId) in validRemoteStreams"
+        :key="userId"
+        class="video-container relative remote-video"
+      >
         <video
-          :srcObject.prop="stream"
+          :ref="el => { if (el) remoteVideoRefs[userId] = el }"
           autoplay
           playsinline
-          class="video-element"
+          class="w-full h-full object-cover rounded-lg"
         ></video>
-        <div class="participant-label">
-          <span class="participant-name">{{ getUsernameById(userId) || 'User ' + userId }}</span>
+        <div class="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-white text-sm">
+          {{ getUsernameById(userId) }}
         </div>
       </div>
     </div>
 
-    <!-- Multiple participants case -->
-    <div v-else class="grid-layout" :class="gridClass">
+    <!-- Standard grid layout for other cases -->
+    <template v-else>
       <!-- Local video -->
-      <transition name="fade" appear>
-        <div v-if="localStream" class="video-container">
-          <video
-            ref="localVideo"
-            :srcObject.prop="localStream"
-            autoplay
-            muted
-            playsinline
-            class="video-element"
-          ></video>
-          <div class="participant-label">
-            <div class="status-indicator local"></div>
-            <span class="participant-name">You</span>
-          </div>
+      <div v-if="localStream" class="video-container relative">
+        <video
+          ref="localVideo"
+          :srcObject.prop="localStream"
+          autoplay
+          playsinline
+          muted
+          class="w-full h-full object-cover rounded-lg"
+        ></video>
+        <div class="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-white text-sm">
+          You
         </div>
-      </transition>
+      </div>
 
       <!-- Remote videos -->
-      <transition-group name="fade" tag="div" class="remote-videos-container">
-        <div
-          v-for="(stream, userId) in validRemoteStreams"
-          :key="userId"
-          class="video-container"
-        >
-          <video
-            :ref="el => { if(el) remoteVideoRefs[userId] = el }"
-            :srcObject.prop="stream"
-            autoplay
-            playsinline
-            class="video-element"
-          ></video>
-          <div class="participant-label">
-            <div class="status-indicator remote"></div>
-            <span class="participant-name">{{ getUsernameById(userId) || 'User ' + userId }}</span>
-          </div>
+      <div
+        v-for="(stream, userId) in validRemoteStreams"
+        :key="userId"
+        class="video-container relative"
+      >
+        <video
+          :ref="el => { if (el) remoteVideoRefs[userId] = el }"
+          autoplay
+          playsinline
+          class="w-full h-full object-cover rounded-lg"
+        ></video>
+        <div class="absolute bottom-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-white text-sm">
+          {{ getUsernameById(userId) }}
         </div>
-      </transition-group>
-    </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -103,22 +110,34 @@ export default {
       remoteVideoRefs: {}
     };
   },
+  data() {
+    return {
+      remoteVideoRefs: {}
+    };
+  },
   computed: {
     totalParticipants() {
+      console.log("users ", this.users);
+      console.log("local stream ", this.localStream);
+      console.log("remote streams ", this.remoteStreams);
+
       // Count local stream (if exists) plus valid remote streams
       return (this.localStream ? 1 : 0) + Object.keys(this.validRemoteStreams).length;
     },
     gridClass() {
       // Determine grid layout based on number of participants
       const count = this.totalParticipants;
+
+      // Special case for two-person calls
+      if (count === 2 && this.localStream && Object.keys(this.validRemoteStreams).length === 1) {
+        return 'two-person-layout';
+      }
+
       if (count <= 1) return '';
-      if (count === 2) return 'grid-cols-1';
       if (count <= 4) return 'grid-cols-2';
       if (count <= 9) return 'grid-cols-3';
-      if (count <= 16) return 'grid-cols-4';
-      return 'grid-cols-5'; // For 17+ participants
+      return 'grid-cols-4';
     },
-    // Filter out remote streams that don't have valid users, but only for display purposes
     validRemoteStreams() {
       const result = {};
 
@@ -126,16 +145,9 @@ export default {
         return result;
       }
 
-      // Get the current user ID to filter out self-connections
-      const currentUserId = this.users && this.users.length > 0
-        ? this.users.find(u => u.isCurrentUser)?.id
-        : null;
-
+      // Debug the remote streams
       Object.entries(this.remoteStreams).forEach(([userId, stream]) => {
-        // Skip streams that are from the current user (self-connections)
-        if (currentUserId && userId === currentUserId.toString()) {
-          return;
-        }
+        console.log(`stream`, stream);
 
         // Include the stream if it's valid
         if (stream && stream.active) {
@@ -216,256 +228,147 @@ export default {
   },
   methods: {
     getUsernameById(userId) {
-      if (!userId) {
-        return 'Unknown User';
+      if (!userId || !this.users || !Array.isArray(this.users)) {
+        return `User ${userId}`;
       }
 
-      if (!this.users || !Array.isArray(this.users) || this.users.length === 0) {
-        return 'User';
-      }
+      // Try to find the user by ID
+      const user = this.users.find(u =>
+        u && (u.id === parseInt(userId) || u.userId === parseInt(userId))
+      );
 
-      // Convert userId to number for comparison if it's a string
-      const userIdNum = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+      return user ? user.username : `User ${userId}`;
+    },
 
-      // Handle NaN case if parsing failed
-      if (isNaN(userIdNum)) {
-        return 'User';
-      }
+    // Method to force refresh video elements
+    refreshVideoElements() {
+      this.$nextTick(() => {
+        // Refresh local video
+        if (this.localStream && this.$refs.localVideo) {
+          const localVideo = this.$refs.localVideo;
+          if (Array.isArray(localVideo)) {
+            localVideo[0].srcObject = this.localStream;
+          } else {
+            localVideo.srcObject = this.localStream;
+          }
+        }
 
-      const user = this.users.find(u => u && u.id === userIdNum);
-      return user && user.username ? user.username : 'User';
+        // Refresh remote videos
+        Object.entries(this.validRemoteStreams).forEach(([userId, stream]) => {
+          const videoEl = this.remoteVideoRefs[userId];
+          if (videoEl && videoEl.srcObject !== stream) {
+            console.log(`Refreshing video for user ${userId}`);
+            videoEl.srcObject = stream;
+            videoEl.play().catch(err => {
+              console.warn(`Could not play remote video for ${userId}:`, err);
+            });
+          }
+        });
+      });
     }
   },
-  updated() {
-    // Check if videos are playing after DOM updates
-    this.$nextTick(() => {
-      // Check local video
-      const localVideo = this.$refs.localVideo;
-      if (localVideo && localVideo.paused && this.localStream) {
-        localVideo.play().catch(err => {
-          console.warn('Failed to play local video after update:', err);
-        });
-      }
-
-      // Check remote videos
-      Object.entries(this.remoteVideoRefs).forEach(([userId, videoEl]) => {
-        if (videoEl && videoEl.paused && this.validRemoteStreams[userId]) {
-          videoEl.play().catch(err => {
-            console.warn(`Failed to play video for user ${userId} after update:`, err);
+  watch: {
+    // Watch for changes in remote streams and update video elements
+    validRemoteStreams: {
+      handler(newStreams) {
+        this.$nextTick(() => {
+          Object.entries(newStreams).forEach(([userId, stream]) => {
+            const videoEl = this.remoteVideoRefs[userId];
+            if (videoEl && videoEl.srcObject !== stream) {
+              console.log(`Setting srcObject for remote video ${userId}`);
+              videoEl.srcObject = stream;
+              videoEl.play().catch(err => {
+                console.warn(`Could not play remote video for ${userId}:`, err);
+              });
+            }
           });
-        }
-      });
-    });
+        });
+      },
+      deep: true,
+      immediate: true
+    },
+
+    // Watch for changes in total participants to handle layout changes
+    totalParticipants: {
+      handler() {
+        this.refreshVideoElements();
+      }
+    }
+  },
+  mounted() {
+    // Initial setup of video elements
+    this.refreshVideoElements();
+  },
+  updated() {
+    // Refresh video elements after DOM updates
+    this.refreshVideoElements();
   }
-}
+};
 </script>
 
 <style scoped>
 .video-grid {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden; /* Prevent scrolling within the video grid */
-  max-height: calc(100% - 60px); /* Reserve space for the end call button */
-}
-
-.single-participant-view {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.video-wrapper {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-}
-
-.grid-layout {
   display: grid;
-  gap: 12px;
-  width: 100%;
+  gap: 1rem;
+  grid-template-columns: 1fr;
   height: 100%;
-  padding: 12px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden; /* Prevent grid overflow */
-}
-
-/* Adjust grid item sizes based on number of participants */
-.grid-layout.grid-cols-1 {
-  grid-template-columns: minmax(0, 1fr);
-  grid-auto-rows: 100%;
-}
-
-.grid-layout.grid-cols-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: calc(50% - 6px);
-}
-
-.grid-layout.grid-cols-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: calc(33.333% - 8px);
-}
-
-.grid-layout.grid-cols-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: calc(25% - 9px);
-}
-
-.grid-layout.grid-cols-5 {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  grid-auto-rows: calc(20% - 9.6px);
-}
-
-.remote-videos-container {
-  display: contents;
+  width: 100%;
 }
 
 .video-container {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border-radius: 12px;
-  position: relative;
-  background-color: #1a1a1a;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
   aspect-ratio: 16/9;
-  max-height: 100%; /* Ensure video containers don't exceed available height */
-}
-
-.video-container:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-}
-
-.video-element {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 12px;
-  transition: filter 0.3s ease;
-}
-
-.participant-label {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
-  background-color: rgba(0, 0, 0, 0.6);
-  color: white;
-  padding: 6px 12px;
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  backdrop-filter: blur(4px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
-  z-index: 10;
-}
-
-.participant-name {
-  font-weight: 500;
-  font-size: 0.9rem;
-  white-space: nowrap;
+  background-color: #1a1a1a;
+  border-radius: 0.5rem;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 150px;
 }
 
-.status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.two-person-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }
 
-.status-indicator.local {
-  background-color: #4ade80; /* Green for local user */
-}
-
-.status-indicator.remote {
-  background-color: #60a5fa; /* Blue for remote users */
-}
-
-/* Fade transition */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.5s ease, transform 0.5s ease;
-}
-
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-/* Responsive adjustments */
-@media (max-width: 1024px) {
-  .video-grid {
-    max-height: calc(100% - 50px); /* Slightly less space reserved on smaller screens */
-  }
-
-  .grid-layout {
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .participant-label {
-    padding: 4px 8px;
-    bottom: 8px;
-    left: 8px;
-  }
-
-  .participant-name {
-    font-size: 0.8rem;
-    max-width: 120px;
-  }
-}
-
+/* For mobile, stack the videos in two-person layout */
 @media (max-width: 768px) {
-  .grid-layout.grid-cols-3 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: calc(33.333% - 5.333px);
-  }
-
-  .grid-layout.grid-cols-4, .grid-layout.grid-cols-5 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: calc(25% - 6px);
+  .two-person-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
   }
 }
 
-@media (max-width: 480px) {
-  .grid-layout {
-    grid-template-columns: 1fr !important;
-    gap: 6px;
-    padding: 6px;
-  }
-
-  .grid-layout.grid-cols-2,
-  .grid-layout.grid-cols-3,
-  .grid-layout.grid-cols-4,
-  .grid-layout.grid-cols-5 {
-    grid-auto-rows: calc(33.333% - 4px);
-  }
-
-  .participant-label {
-    bottom: 6px;
-    left: 6px;
-  }
+.grid-cols-1 {
+  grid-template-columns: 1fr;
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .video-container {
-    background-color: #121212;
-  }
+.grid-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid-cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.grid-cols-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #666;
+  font-size: 1.2rem;
+}
+
+.debug-info {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  padding: 5px;
+  font-size: 12px;
+  z-index: 100;
 }
 </style>
