@@ -30,14 +30,49 @@
         </div>
         All Users <span class="ml-2 px-2 py-1 text-sm bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">{{ users.length }}</span>
       </h3>
-      <ul v-if="users.length" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-        <li v-for="user in users" :key="user.id" class="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors duration-150">
-          <span class="w-3 h-3 rounded-full mr-3"
-                :class="user.isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-600'"></span>
-          <span class="text-gray-700 dark:text-gray-300" :class="{'font-medium': user.isOnline}">{{ user.username }}</span>
-        </li>
-      </ul>
-      <p v-else class="text-gray-500 dark:text-gray-400 italic text-sm">No users available</p>
+      <div v-if="!users || users.length === 0" class="text-gray-500 italic text-center mt-4">
+        No users available
+      </div>
+
+      <div v-else>
+        <div
+          v-for="user in sortedUsers"
+          :key="user.id"
+          class="flex items-center p-2 hover:bg-gray-100 rounded-lg mb-1"
+        >
+          <div class="relative">
+            <!-- User avatar or placeholder -->
+            <div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-semibold">
+              {{ getUserInitials(user.username) }}
+            </div>
+
+            <!-- Online status indicator -->
+            <div
+              class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white"
+              :class="user.isOnline ? 'bg-green-500' : 'bg-gray-400'"
+            ></div>
+          </div>
+
+          <div class="ml-3 flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <p class="text-sm font-medium text-gray-900 truncate">
+                {{ user.username }}
+              </p>
+              <span
+                class="text-xs px-2 py-1 rounded-full"
+                :class="user.isOnline ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
+              >
+                {{ user.isOnline ? 'Online' : 'Offline' }}
+              </span>
+            </div>
+
+            <!-- Typing indicator -->
+            <p v-if="user.is_typing" class="text-xs text-gray-500 italic">
+              typing...
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -50,6 +85,10 @@ export default {
       type: Array,
       required: true,
       default: () => []
+    },
+    initialWidth: {
+      type: Number,
+      default: 288
     }
   },
   data() {
@@ -64,6 +103,17 @@ export default {
     },
     onlineCount() {
       return this.onlineUsers.length || 0;
+    },
+    sortedUsers() {
+      // Sort users: online users first, then alphabetically by username
+      return [...this.users].sort((a, b) => {
+        // First sort by online status
+        if (a.isOnline && !b.isOnline) return -1;
+        if (!a.isOnline && b.isOnline) return 1;
+
+        // Then sort alphabetically by username
+        return a.username.localeCompare(b.username);
+      });
     }
   },
   methods: {
@@ -97,6 +147,22 @@ export default {
 
       // Clear typing status
       this.$set(this.typingUsers, userId, false);
+    },
+    getUserInitials(username) {
+      if (!username) return '?';
+
+      // Safely get initials from username
+      try {
+        return username
+          .split(' ')
+          .map(name => name.charAt(0))
+          .join('')
+          .toUpperCase()
+          .substring(0, 2);
+      } catch (error) {
+        console.error('Error getting user initials:', error);
+        return '?';
+      }
     }
   },
   beforeDestroy() {
@@ -156,5 +222,27 @@ export default {
   40% { opacity: 1; }
   60% { opacity: 1; }
   80%, 100% { opacity: 0; }
+}
+
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #ddd;
+  border-radius: 2px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #bbb;
 }
 </style>

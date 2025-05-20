@@ -28,7 +28,7 @@
           class="video-element"
         ></video>
         <div class="participant-label">
-          <span class="participant-name">{{ getUsernameById(userId) }}</span>
+          <span class="participant-name">{{ getUsernameById(userId) || 'User ' + userId }}</span>
         </div>
       </div>
     </div>
@@ -61,6 +61,7 @@
           class="video-container"
         >
           <video
+            :ref="el => { if(el) remoteVideoRefs[userId] = el }"
             :srcObject.prop="stream"
             autoplay
             playsinline
@@ -68,7 +69,7 @@
           ></video>
           <div class="participant-label">
             <div class="status-indicator remote"></div>
-            <span class="participant-name">{{ getUsernameById(userId) }}</span>
+            <span class="participant-name">{{ getUsernameById(userId) || 'User ' + userId }}</span>
           </div>
         </div>
       </transition-group>
@@ -91,7 +92,16 @@ export default {
     users: {
       type: Array,
       default: () => ([])
+    },
+    currentUserId: {
+      type: [String, Number],
+      required: true
     }
+  },
+  data() {
+    return {
+      remoteVideoRefs: {}
+    };
   },
   computed: {
     totalParticipants() {
@@ -136,6 +146,74 @@ export default {
       return result;
     }
   },
+  watch: {
+    localStream(newStream) {
+      this.$nextTick(() => {
+        if (newStream && this.$refs.localVideo) {
+          console.log('Setting local video stream');
+          this.$refs.localVideo.srcObject = newStream;
+        }
+      });
+    },
+
+    remoteStreams: {
+      handler(newStreams) {
+        this.$nextTick(() => {
+          console.log('Updating remote video streams');
+          Object.entries(newStreams).forEach(([userId, stream]) => {
+            const refName = `remoteVideo_${userId}`;
+            if (this.$refs[refName] && this.$refs[refName][0]) {
+              console.log(`Setting stream for remote user ${userId}`);
+              this.$refs[refName][0].srcObject = stream;
+            } else {
+              console.warn(`Video element for user ${userId} not found`);
+            }
+          });
+        });
+      },
+      deep: true
+    },
+    validRemoteStreams: {
+      handler() {
+        this.$nextTick(() => {
+          // Ensure all videos are playing
+          Object.entries(this.remoteVideoRefs).forEach(([userId, videoEl]) => {
+            if (videoEl && videoEl.paused && this.validRemoteStreams[userId]) {
+              videoEl.play().catch(err => {
+                console.warn(`Failed to play video for user ${userId}:`, err);
+              });
+            }
+          });
+        });
+      },
+      deep: true
+    }
+  },
+  mounted() {
+    // Set initial streams
+    if (this.localStream && this.$refs.localVideo) {
+      this.$refs.localVideo.srcObject = this.localStream;
+    }
+
+    this.$nextTick(() => {
+      Object.entries(this.remoteStreams).forEach(([userId, stream]) => {
+        const refName = `remoteVideo_${userId}`;
+        if (this.$refs[refName] && this.$refs[refName][0]) {
+          this.$refs[refName][0].srcObject = stream;
+        }
+      });
+    });
+
+    // Ensure local video is playing
+    this.$nextTick(() => {
+      const localVideo = this.$refs.localVideo;
+      if (localVideo && this.localStream) {
+        localVideo.play().catch(err => {
+          console.warn('Failed to play local video:', err);
+        });
+      }
+    });
+  },
   methods: {
     getUsernameById(userId) {
       if (!userId) {
@@ -157,6 +235,27 @@ export default {
       const user = this.users.find(u => u && u.id === userIdNum);
       return user && user.username ? user.username : 'User';
     }
+  },
+  updated() {
+    // Check if videos are playing after DOM updates
+    this.$nextTick(() => {
+      // Check local video
+      const localVideo = this.$refs.localVideo;
+      if (localVideo && localVideo.paused && this.localStream) {
+        localVideo.play().catch(err => {
+          console.warn('Failed to play local video after update:', err);
+        });
+      }
+
+      // Check remote videos
+      Object.entries(this.remoteVideoRefs).forEach(([userId, videoEl]) => {
+        if (videoEl && videoEl.paused && this.validRemoteStreams[userId]) {
+          videoEl.play().catch(err => {
+            console.warn(`Failed to play video for user ${userId} after update:`, err);
+          });
+        }
+      });
+    });
   }
 }
 </script>

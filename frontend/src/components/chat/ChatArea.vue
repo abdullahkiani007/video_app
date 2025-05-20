@@ -49,6 +49,19 @@
           </div>
         </div>
       </div>
+
+      <!-- Typing indicator -->
+      <div v-if="typingUsers && typingUsers.length > 0" class="text-xs text-gray-500 italic mt-2 ml-2">
+        <span v-if="typingUsers.length === 1">
+          {{ typingUsers[0] }} is typing...
+        </span>
+        <span v-else-if="typingUsers.length === 2">
+          {{ typingUsers[0] }} and {{ typingUsers[1] }} are typing...
+        </span>
+        <span v-else>
+          {{ typingUsers.slice(0, 2).join(', ') }} and {{ typingUsers.length - 2 }} more are typing...
+        </span>
+      </div>
     </div>
 
     <!-- Message input with fixed height -->
@@ -85,12 +98,28 @@ export default {
     currentUser: {
       type: String,
       default: ''
+    },
+    // Add new props for typing indicators
+    typingUsers: {
+      type: Array,
+      default: () => []
+    },
+    // Support both currentUser and currentUserId for flexibility
+    currentUserId: {
+      type: String,
+      default: ''
     }
   },
   data() {
     return {
       newMessage: '',
       typingTimeout: null
+    }
+  },
+  computed: {
+    // Use either currentUser or currentUserId based on what's provided
+    effectiveCurrentUser() {
+      return this.currentUser || this.currentUserId || '';
     }
   },
   watch: {

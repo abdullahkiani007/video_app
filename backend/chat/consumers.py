@@ -48,6 +48,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         data = json.loads(text_data)
         message_type = data.get('type', '')
+        print("message_type", message_type)
 
         if message_type == 'join':
             self.user_id = data.get('userId', '')
@@ -69,6 +70,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 {
                     'type': 'chat_message',
                     'message': data
+                }
+            )
+
+        elif message_type == 'typing':
+            # Handle typing indicator
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'user_typing',
+                    'userId': data.get('userId', ''),
+                    'username': data.get('username', ''),
+                    'isTyping': data.get('isTyping', False)
                 }
             )
 
@@ -114,6 +127,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
     # Handler for leave call
     async def leave_call(self, event):
         await self.send(text_data=json.dumps(event['data']))
+
+    # Add a new handler for typing indicators
+    async def user_typing(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'typing',
+            'userId': event['userId'],
+            'username': event['username'],
+            'isTyping': event['isTyping']
+        }))
 
     # Database operations
     @database_sync_to_async

@@ -419,6 +419,15 @@ export default {
           };
           this.messages.push(formattedMessage);
           break;
+
+          case 'typing':
+          // Handle typing status updates from other users
+          console.log(`User ${data.userId} (${data.username}) is ${data.isTyping ? 'typing' : 'not typing'}`);
+          if (data.userId !== this.userId) {  // Don't process our own typing events
+            this.updateUserTypingStatus(data.userId, data.isTyping, 'global');
+          }
+          break;
+
         case 'join-call':
           console.log(`User ${data.userId} joined the call`);
 
@@ -1001,34 +1010,40 @@ export default {
         this.statusSocket.close();
       }
 
-      // Create new WebSocket connection
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/user-status/`;
+      try {
+        // Use the same WebSocket URL pattern as your working chat WebSocket
+        const baseWsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 
-      this.statusSocket = new WebSocket(wsUrl);
+        // IMPORTANT: Make sure this endpoint path matches exactly what your backend expects
+        // If your backend doesn't have a separate user-status endpoint, you might need to use the same endpoint
+        this.statusSocket = new WebSocket(`${baseWsUrl}/ws/user-status/`);
 
-      this.statusSocket.onopen = () => {
-        console.log('Status WebSocket connected');
-      };
+        console.log(`Attempting to connect status WebSocket to: ${baseWsUrl}/ws/user-status/`);
 
-      this.statusSocket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        this.handleStatusMessage(data);
-      };
+        this.statusSocket.onopen = () => {
+          console.log('Status WebSocket connected successfully');
+        };
 
-      this.statusSocket.onclose = () => {
-        console.log('Status WebSocket disconnected');
-        // Try to reconnect after a delay
-        setTimeout(() => {
-          if (this.userId) {
-            this.connectStatusWebSocket();
+        this.statusSocket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('Status WebSocket message received:', data);
+            this.handleStatusMessage(data);
+          } catch (error) {
+            console.error('Error parsing status WebSocket message:', error);
           }
-        }, 3000);
-      };
+        };
 
-      this.statusSocket.onerror = (error) => {
-        console.error('Status WebSocket error:', error);
-      };
+        this.statusSocket.onclose = (event) => {
+          console.log(`Status WebSocket disconnected: code=${event.code}, reason=${event.reason}`);
+        };
+
+        this.statusSocket.onerror = (error) => {
+          console.error('Status WebSocket error:', error);
+        };
+      } catch (error) {
+        console.error('Failed to connect status WebSocket:', error);
+      }
     },
 
     handleStatusMessage(data) {
@@ -1052,6 +1067,8 @@ export default {
     },
 
     updateUserTypingStatus(userId, isTyping, conversationId) {
+      console.log(`User ${userId} is ${isTyping ? 'typing' : 'not typing'} in conversation ${conversationId}`);
+
       // Update the users array
       this.users = this.users.map(user => {
         if (user.id === userId) {
@@ -1062,21 +1079,37 @@ export default {
     },
 
     sendTypingStatus(isTyping, conversationId) {
+      console.log(`Sending typing status: ${isTyping} for conversation ${conversationId}`);
+
       if (this.statusSocket && this.statusSocket.readyState === WebSocket.OPEN) {
         this.statusSocket.send(JSON.stringify({
           type: 'typing_status',
           is_typing: isTyping,
           conversation_id: conversationId
         }));
+      } else {
+        console.warn('Status WebSocket not connected, cannot send typing status');
       }
     },
 
     handleTyping(isTyping) {
-      // Get the current conversation ID
-      const conversationId = this.currentConversationId; // You'll need to track this
+      const conversationId = 'global';
+      console.log(`Local user is ${isTyping ? 'typing' : 'stopped typing'}`);
 
-      // Send typing status to WebSocket
-      this.sendTypingStatus(isTyping, conversationId);
+
+      // Always send through main chat WebSocket since we know it's working
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        console.log('Sending typing status through main chat WebSocket');
+        this.socket.send(JSON.stringify({
+          type: 'typing',
+          userId: this.userId,
+          username: this.username,
+          isTyping: isTyping
+        }));
+      } else {
+
+        console.warn('Main chat WebSocket not connected, cannot send typing status');
+      }
     }
   }
 }
