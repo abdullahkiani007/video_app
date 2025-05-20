@@ -1,36 +1,125 @@
 <template>
-  <div class="flex h-screen">
-    <!-- Left sidebar for user list -->
-    <div class="w-64 bg-gray-100 p-4">
-      <h2 class="text-xl font-bold mb-4">Online Users</h2>
-      <UserList :users="users" />
-    </div>
-
-    <!-- Main content area -->
-    <div class="flex-1 flex flex-col">
-      <!-- Video grid -->
-      <div class="flex-1 p-4 bg-gray-900">
+  <div class="relative h-screen flex flex-col">
+    <!-- Main content area (video) -->
+    <div class="flex-1 bg-gray-900 relative">
+      <div v-if="isInCall || Object.keys(remoteStreams).length > 0">
         <VideoGrid
           :localStream="localStream"
           :remoteStreams="remoteStreams"
+          :users="users"
+          :currentUserId="userId"
         />
-        <div class="absolute bottom-72 left-1/2 transform -translate-x-1/2">
-          <CallControls
-            :isInCall="isInCall"
-            @join-call="joinCall"
-            @leave-call="leaveCall"
-          />
-        </div>
+      </div>
+      <div v-else class="flex items-center justify-center h-full">
+        <p class="text-white text-xl text-center px-4">Join the call to start video chat</p>
       </div>
 
-      <!-- Chat area -->
-      <div class="h-64 bg-white border-t">
+      <!-- Call controls -->
+      <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-full max-w-md px-4">
+        <CallControls
+          :isInCall="isInCall"
+          @join-call="joinCall"
+          @leave-call="leaveCall"
+        />
+      </div>
+
+      <!-- Toggle buttons for sidebars -->
+      <div class="absolute top-4 left-4">
+        <button
+          @click="toggleUserList"
+          class="bg-gray-800 text-white p-2 rounded-full shadow-lg hover:bg-gray-700 focus:outline-none"
+          title="Toggle user list"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="absolute top-4 right-4">
+        <button
+          @click="toggleChatArea"
+          class="bg-gray-800 text-white p-2 rounded-full shadow-lg hover:bg-gray-700 focus:outline-none"
+          title="Toggle chat"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Left sidebar for user list - slidable and resizable -->
+    <div
+      class="fixed top-0 left-0 h-full bg-gray-100 w-64 transform transition-transform duration-300 ease-in-out z-20 shadow-lg"
+      :class="userListOpen ? 'translate-x-0' : '-translate-x-full'"
+      :style="userListOpen ? { width: `${userListWidth}px` } : {}"
+    >
+      <div class="p-4 h-full relative">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold">Online Users</h2>
+          <button
+            @click="toggleUserList"
+            class="text-gray-600 hover:text-gray-900 focus:outline-none"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <UserList :users="users" :initial-width="userListWidth - 32" />
+
+        <!-- Resize handle -->
+        <div
+          class="absolute top-0 right-0 w-4 h-full cursor-ew-resize"
+          @mousedown="startResizing('userList', $event)"
+        >
+          <div class="w-1 h-full bg-gray-300 hover:bg-blue-500 mx-auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right sidebar for chat - slidable and resizable -->
+    <div
+      class="fixed top-0 right-0 h-full bg-white w-80 transform transition-transform duration-300 ease-in-out z-20 shadow-lg flex flex-col"
+      :class="chatAreaOpen ? 'translate-x-0' : 'translate-x-full'"
+      :style="chatAreaOpen ? { width: `${chatAreaWidth}px` } : {}"
+    >
+      <div class="flex justify-between items-center p-4 border-b">
+        <h2 class="text-xl font-bold">Chat</h2>
+        <button
+          @click="toggleChatArea"
+          class="text-gray-600 hover:text-gray-900 focus:outline-none"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="flex-1 overflow-hidden flex flex-col relative">
         <ChatArea
           :messages="messages"
           @send-message="sendMessage"
+          @typing="handleTyping"
+          class="flex-1 overflow-y-auto"
         />
+
+        <!-- Resize handle -->
+        <div
+          class="absolute top-0 left-0 w-4 h-full cursor-ew-resize"
+          @mousedown="startResizing('chatArea', $event)"
+        >
+          <div class="w-1 h-full bg-gray-300 hover:bg-blue-500 mx-auto"></div>
+        </div>
       </div>
     </div>
+
+    <!-- Overlay when sidebars are open on mobile -->
+    <div
+      v-if="(userListOpen || chatAreaOpen) && isMobile"
+      class="fixed inset-0 bg-black bg-opacity-50 z-10"
+      @click="closeAllSidebars"
+    ></div>
   </div>
 </template>
 
@@ -62,7 +151,18 @@ export default {
       socket: null as WebSocket | null,
       isInCall: false,
       userId: '',
-      username: ''
+      username: '',
+      _pendingCandidates: {} as Record<string, RTCIceCandidate[]>,
+      // New state for sidebar toggles and sizes
+      userListOpen: false,
+      chatAreaOpen: false,
+      isMobile: false,
+      userListWidth: 320,
+      chatAreaWidth: 380,
+      resizing: null,
+      minSidebarWidth: 250,
+      maxSidebarWidth: 600,
+      statusSocket: null
     }
   },
   created() {
@@ -82,14 +182,136 @@ export default {
     this.fetchUsers();
     this.fetchMessages();
     this.connectWebSocket();
+    this.connectStatusWebSocket();
+
+    // Check if device is mobile
+    this.checkIfMobile();
+    window.addEventListener('resize', this.checkIfMobile);
+
+    // Load saved sidebar widths from localStorage
+    this.loadSavedSidebarWidths();
+  },
+  mounted() {
+    // Add global event listeners for resizing
+    document.addEventListener('mousemove', this.handleResize);
+    document.addEventListener('mouseup', this.stopResizing);
   },
   beforeUnmount() {
     this.leaveCall();
     if (this.socket) {
       this.socket.close();
     }
+    window.removeEventListener('resize', this.checkIfMobile);
+
+    // Remove global event listeners
+    document.removeEventListener('mousemove', this.handleResize);
+    document.removeEventListener('mouseup', this.stopResizing);
   },
   methods: {
+    // New methods for sidebar functionality
+    toggleUserList() {
+      this.userListOpen = !this.userListOpen;
+      // Close chat area on mobile when opening user list
+      if (this.userListOpen && this.isMobile && this.chatAreaOpen) {
+        this.chatAreaOpen = false;
+      }
+    },
+    toggleChatArea() {
+      this.chatAreaOpen = !this.chatAreaOpen;
+      // Close user list on mobile when opening chat area
+      if (this.chatAreaOpen && this.isMobile && this.userListOpen) {
+        this.userListOpen = false;
+      }
+    },
+    closeAllSidebars() {
+      this.userListOpen = false;
+      this.chatAreaOpen = false;
+    },
+    checkIfMobile() {
+      this.isMobile = window.innerWidth < 768;
+      // Auto-close sidebars when switching to mobile
+      if (this.isMobile && (this.userListOpen && this.chatAreaOpen)) {
+        // Keep only one sidebar open on mobile
+        this.chatAreaOpen = false;
+      }
+    },
+
+    // New methods for sidebar resizing
+    loadSavedSidebarWidths() {
+      try {
+        // Load user list width
+        const savedUserListWidth = localStorage.getItem('userListWidth');
+        if (savedUserListWidth) {
+          const width = parseInt(savedUserListWidth);
+          if (!isNaN(width) && width >= this.minSidebarWidth && width <= this.maxSidebarWidth) {
+            this.userListWidth = width;
+          }
+        }
+
+        // Load chat area width
+        const savedChatAreaWidth = localStorage.getItem('chatAreaWidth');
+        if (savedChatAreaWidth) {
+          const width = parseInt(savedChatAreaWidth);
+          if (!isNaN(width) && width >= this.minSidebarWidth && width <= this.maxSidebarWidth) {
+            this.chatAreaWidth = width;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading saved sidebar widths:', error);
+      }
+    },
+
+    startResizing(sidebar, event) {
+      if (this.isMobile) return; // Disable resizing on mobile
+
+      this.resizing = sidebar;
+      event.preventDefault();
+    },
+
+    handleResize(event) {
+      if (!this.resizing) return;
+
+      const windowWidth = window.innerWidth;
+
+      if (this.resizing === 'userList') {
+        // Calculate new width based on mouse position
+        let newWidth = event.clientX;
+
+        // Apply constraints
+        newWidth = Math.max(this.minSidebarWidth, Math.min(newWidth, this.maxSidebarWidth));
+        newWidth = Math.min(newWidth, windowWidth * 0.5); // Max 50% of window width
+
+        this.userListWidth = newWidth;
+
+        // Save to localStorage
+        try {
+          localStorage.setItem('userListWidth', newWidth.toString());
+        } catch (error) {
+          console.error('Error saving user list width:', error);
+        }
+      } else if (this.resizing === 'chatArea') {
+        // For right sidebar, calculate width from right edge
+        let newWidth = windowWidth - event.clientX;
+
+        // Apply constraints
+        newWidth = Math.max(this.minSidebarWidth, Math.min(newWidth, this.maxSidebarWidth));
+        newWidth = Math.min(newWidth, windowWidth * 0.5); // Max 50% of window width
+
+        this.chatAreaWidth = newWidth;
+
+        // Save to localStorage
+        try {
+          localStorage.setItem('chatAreaWidth', newWidth.toString());
+        } catch (error) {
+          console.error('Error saving chat area width:', error);
+        }
+      }
+    },
+
+    stopResizing() {
+      this.resizing = null;
+    },
+
     async fetchUsers() {
       try {
         const response = await api.getUsers();
@@ -152,6 +374,7 @@ export default {
         this.socket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', data); // Log all incoming messages
             this.handleSocketMessage(data);
           } catch (error) {
             console.error('Error parsing WebSocket message:', error);
@@ -176,10 +399,12 @@ export default {
         return;
       }
 
+      console.log('Received WebSocket message:', data.type);
+
       switch (data.type) {
         case 'users':
           // Update online users from WebSocket
-          this.onlineUsers = data.users;
+          this.onlineUsers = data.users || [];
           // Mark online status in allUsers
           this.updateUserStatus();
           break;
@@ -194,7 +419,28 @@ export default {
           };
           this.messages.push(formattedMessage);
           break;
+        case 'join-call':
+          console.log(`User ${data.userId} joined the call`);
+
+          // If another user joined the call and we're already in the call,
+          // we should initiate the connection to them
+          if (data.userId !== this.userId && this.isInCall) {
+            console.log(`We're already in call, initiating connection to new user ${data.userId}`);
+
+            // Create peer connection if it doesn't exist
+            if (!this.peerConnections[data.userId]) {
+              this.createPeerConnection(data.userId);
+            }
+
+            // Create and send offer - we initiate because we were already in the call
+            this.createOfferToUser(data.userId);
+          }
+          break;
+        case 'leave-call':
+          this.handleUserLeft(data.userId);
+          break;
         case 'offer':
+          // Always handle offers
           this.handleOffer(data);
           break;
         case 'answer':
@@ -260,36 +506,468 @@ export default {
 
     async joinCall() {
       try {
-        // Request user media with error handling
-        this.localStream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: true
-        }).catch(error => {
-          console.error('Error accessing media devices:', error);
-          alert('Could not access camera or microphone. Please check permissions.');
-          return null;
-        });
+        console.log("joining call");
+        console.log("this.userId ", this.userId);
 
-        if (!this.localStream) return;
+        // Check if we're in Firefox
+        const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
 
-        this.isInCall = true;
+        let videoStream;
 
-        // Notify other users that we've joined the call
-        if (this.socket) {
-          this.socket.send(JSON.stringify({
-            type: 'join-call',
-            userId: this.userId
-          }));
+        if (isFirefox) {
+          // Firefox fallback: use getUserMedia directly
+          try {
+            // Try to get a video stream from the camera
+            videoStream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: true
+            });
+            console.log("Using camera stream for Firefox");
+          } catch (err) {
+            console.warn('Could not access camera in Firefox:', err);
+            // Create a canvas-based fallback if camera access fails
+            const canvas = document.createElement('canvas');
+            canvas.width = 640;
+            canvas.height = 480;
+            const ctx = canvas.getContext('2d');
+
+            // Draw a simple placeholder
+            if (ctx) {
+              ctx.fillStyle = '#333333';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.fillStyle = 'white';
+              ctx.font = '24px Arial';
+              ctx.fillText(`${this.username}`, 20, 40);
+              ctx.fillText('Video unavailable', 20, 80);
+            }
+
+            // Get stream from canvas
+            videoStream = canvas.captureStream(30); // 30 FPS
+
+            // Add audio if possible
+            try {
+              const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+              audioStream.getAudioTracks().forEach(track => videoStream.addTrack(track));
+            } catch (e) {
+              console.warn('Could not add audio to canvas stream:', e);
+            }
+
+            console.log("Using canvas fallback stream for Firefox");
+          }
+        } else {
+          // Chrome and other browsers: use video file as before
+          const videoElement = document.createElement('video');
+          videoElement.src = 'src/assets/video.webm'; // Adjust path if needed
+          videoElement.loop = true;
+          videoElement.muted = true;
+
+          // Wait for video to be loaded before capturing
+          await new Promise((resolve) => {
+            videoElement.onloadedmetadata = resolve;
+            videoElement.load();
+          });
+
+          // Start playing the video (needed for captureStream)
+          await videoElement.play().catch(err => {
+            console.error('Error playing video:', err);
+            throw new Error('Could not play video file');
+          });
+
+          // Capture stream from the video element
+          videoStream = videoElement.captureStream();
+
+          // Add audio track if possible
+          try {
+            const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            audioStream.getAudioTracks().forEach(track => videoStream.addTrack(track));
+          } catch (e) {
+            console.warn('Could not add audio to video stream:', e);
+          }
+
+          console.log("Using video file stream");
         }
 
-        // Create peer connections with existing users in call
-        this.users.forEach(user => {
-          if (user.id !== this.userId && user.inCall) {
-            this.createPeerConnection(user.id);
+        this.localStream = videoStream;
+        this.isInCall = true;
+
+        // Display local video
+        if (this.$refs.localVideo) {
+          this.$refs.localVideo.srcObject = this.localStream;
+        }
+
+        // Notify others that you've joined
+        console.log("Sending join-call message to WebSocket");
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+          this.socket.send(JSON.stringify({
+            type: 'join-call',
+            userId: this.userId,
+            username: this.username
+          }));
+          console.log("Sent join-call message");
+        } else {
+          console.error('WebSocket not connected, cannot send join-call message');
+          return;
+        }
+
+        // Add a delay to ensure the join-call message is processed first
+        setTimeout(() => {
+          // Find all users who are already in the call
+          // We need to initiate connections to all users already in the call
+          const usersInCall = this.onlineUsers.filter(user =>
+            user.inCall && user.userId !== this.userId
+          );
+
+          if (usersInCall.length > 0) {
+            console.log(`Creating offers to ${usersInCall.length} users already in call`);
+            usersInCall.forEach(user => {
+              // Create peer connection if it doesn't exist
+              if (!this.peerConnections[user.userId]) {
+                this.createPeerConnection(user.userId);
+              }
+              // Create and send offer
+              this.createOfferToUser(user.userId);
+            });
+          } else {
+            console.log("No other users in call to connect to");
           }
-        });
+        }, 1000);
       } catch (error) {
         console.error('Error joining call:', error);
+        alert('Failed to join call: ' + (error.message || 'Unknown error'));
+      }
+    },
+
+    async createOfferToUser(userId) {
+      console.log(`Creating offer to user ${userId}`);
+
+      // Create peer connection if it doesn't exist
+      if (!this.peerConnections[userId]) {
+        this.createPeerConnection(userId);
+      }
+
+      try {
+        // Create offer
+        const offer = await this.peerConnections[userId].createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true
+        });
+
+        await this.peerConnections[userId].setLocalDescription(offer);
+
+        // Send the offer to the remote peer
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+          this.socket.send(JSON.stringify({
+            type: 'offer',
+            userId: this.userId,
+            targetUserId: userId,
+            sdp: this.peerConnections[userId].localDescription
+          }));
+          console.log(`Sent offer to user ${userId}`);
+        } else {
+          console.error('WebSocket not connected, cannot send offer');
+        }
+      } catch (error) {
+        console.error(`Error creating offer to user ${userId}:`, error);
+      }
+    },
+
+    createPeerConnection(remoteUserId) {
+      console.log(`Creating new peer connection to ${remoteUserId}`);
+
+      // Create RTCPeerConnection with ICE servers
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' }
+        ]
+      });
+
+      this.peerConnections[remoteUserId] = pc;
+
+      // Add all local tracks to the connection if we're in a call
+      if (this.isInCall && this.localStream) {
+        this.localStream.getTracks().forEach(track => {
+          console.log(`Adding ${track.kind} track to peer connection for ${remoteUserId}`);
+          pc.addTrack(track, this.localStream);
+        });
+      } else {
+        console.log('Not adding local tracks - either not in call or no local stream');
+        console.log('isInCall:', this.isInCall);
+        console.log('localStream exists:', !!this.localStream);
+      }
+
+      // Handle incoming tracks
+      pc.ontrack = (event) => {
+        console.log(`Received track from ${remoteUserId}:`, event.track.kind);
+
+        // Create a new MediaStream if it doesn't exist for this user
+        if (!this.remoteStreams[remoteUserId]) {
+          this.remoteStreams[remoteUserId] = new MediaStream();
+          // Force reactivity update
+          this.remoteStreams = { ...this.remoteStreams };
+        }
+
+        // Add the track to the remote stream
+        this.remoteStreams[remoteUserId].addTrack(event.track);
+
+        // Force reactivity update again after adding track
+        this.remoteStreams = { ...this.remoteStreams };
+
+        console.log(`Added ${event.track.kind} track to remote stream for ${remoteUserId}`);
+        console.log(`Current remote streams:`, Object.keys(this.remoteStreams));
+      };
+
+      // Handle ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log(`Generated ICE candidate for ${remoteUserId}`);
+
+          // Send the ICE candidate to the remote peer
+          if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+              type: 'ice-candidate',
+              userId: this.userId,
+              targetUserId: remoteUserId,
+              candidate: event.candidate
+            }));
+            console.log(`Sent ICE candidate to ${remoteUserId}`);
+          } else {
+            console.error('WebSocket not connected, cannot send ICE candidate');
+          }
+        }
+      };
+
+      // Log connection state changes
+      pc.onconnectionstatechange = () => {
+        console.log(`Connection state for ${remoteUserId} changed to: ${pc.connectionState}`);
+        if (pc.connectionState === 'connected') {
+          console.log(`Successfully connected to ${remoteUserId}`);
+        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+          console.warn(`Connection to ${remoteUserId} ${pc.connectionState}`);
+
+          // Clean up failed connections
+          if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+            this.handleUserLeft(remoteUserId);
+
+            // If still in call, try to reconnect after a delay
+            if (this.isInCall) {
+              setTimeout(() => {
+                if (this.isInCall) {
+                  console.log(`Attempting to reconnect to ${remoteUserId}`);
+                  this.createPeerConnection(remoteUserId);
+                  this.createOfferToUser(remoteUserId);
+                }
+              }, 2000);
+            }
+          }
+        }
+      };
+
+      // Log ICE connection state changes
+      pc.oniceconnectionstatechange = () => {
+        console.log(`ICE connection state for ${remoteUserId} changed to: ${pc.iceConnectionState}`);
+
+        // Handle ICE connection failures
+        if (pc.iceConnectionState === 'failed') {
+          console.warn(`ICE connection to ${remoteUserId} failed, attempting ICE restart`);
+
+          // Try ICE restart if connection fails
+          if (pc.restartIce) {
+            pc.restartIce();
+          } else if (this.isInCall) {
+            // Fallback: recreate the connection
+            this.handleUserLeft(remoteUserId);
+            setTimeout(() => {
+              if (this.isInCall) {
+                this.createPeerConnection(remoteUserId);
+                this.createOfferToUser(remoteUserId);
+              }
+            }, 1000);
+          }
+        }
+      };
+
+      return pc;
+    },
+
+    async handleOffer(data) {
+      try {
+        // Extract the correct fields from the data
+        const from = data.userId;
+        const offer = data.sdp;
+
+        if (!from || !offer) {
+          console.error('Invalid offer data received:', data);
+          return;
+        }
+
+        console.log(`Received offer from ${from}:`, offer);
+
+        // Create peer connection if it doesn't exist
+        let pc = this.peerConnections[from];
+        if (!pc) {
+          console.log(`Creating new peer connection for offer from ${from}`);
+          pc = this.createPeerConnection(from);
+          if (!pc) {
+            console.error(`Failed to create peer connection for ${from}`);
+            return;
+          }
+        }
+
+        // Set remote description
+        console.log(`Setting remote description for ${from}`);
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        console.log(`Remote description set for ${from}`);
+
+        // Add local tracks if in call and not already added
+        if (this.isInCall && this.localStream) {
+          const senders = pc.getSenders();
+          const tracksToAdd = this.localStream.getTracks().filter(track =>
+            !senders.some(sender => sender.track === track)
+          );
+
+          for (const track of tracksToAdd) {
+            console.log(`Adding ${track.kind} track to peer connection for ${from} after receiving offer`);
+            pc.addTrack(track, this.localStream);
+          }
+        }
+
+        // Create answer
+        console.log(`Creating answer for ${from}`);
+        const answer = await pc.createAnswer();
+        console.log(`Answer created for ${from}:`, answer);
+
+        await pc.setLocalDescription(answer);
+        console.log(`Local description (answer) set for ${from}`);
+
+        // Send answer
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+          console.log(`Sending answer to ${from}`);
+          this.socket.send(JSON.stringify({
+            type: 'answer',
+            userId: this.userId,
+            targetUserId: from,
+            sdp: pc.localDescription
+          }));
+          console.log(`Answer sent to ${from}`);
+        } else {
+          console.error('WebSocket not connected, cannot send answer');
+        }
+
+        // Apply any pending ICE candidates
+        if (this._pendingCandidates && this._pendingCandidates[from]) {
+          console.log(`Applying ${this._pendingCandidates[from].length} pending ICE candidates for ${from}`);
+          for (const candidate of this._pendingCandidates[from]) {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          }
+          delete this._pendingCandidates[from];
+        }
+      } catch (error) {
+        console.error('Error handling offer:', error);
+      }
+    },
+
+    async handleAnswer(data) {
+      try {
+        // Extract the correct fields from the data
+        const from = data.userId;
+        const answer = data.sdp;
+
+        if (!from || !answer) {
+          console.error('Invalid answer data received:', data);
+          return;
+        }
+
+        console.log(`Received answer from ${from}:`, answer);
+
+        const pc = this.peerConnections[from];
+        if (!pc) {
+          console.error(`No peer connection found for ${from}`);
+          return;
+        }
+
+        // Check if we can set the remote description
+        if (pc.signalingState === 'have-local-offer') {
+          console.log(`Setting remote description (answer) for ${from}`);
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+          console.log(`Remote description (answer) set for ${from}`);
+
+          // Apply any pending ICE candidates
+          if (this._pendingCandidates && this._pendingCandidates[from]) {
+            console.log(`Applying ${this._pendingCandidates[from].length} pending ICE candidates for ${from}`);
+            for (const candidate of this._pendingCandidates[from]) {
+              await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+            delete this._pendingCandidates[from];
+          }
+        } else {
+          console.error(`Cannot set remote description in state: ${pc.signalingState}`);
+        }
+      } catch (error) {
+        console.error('Error handling answer:', error);
+      }
+    },
+
+    async handleIceCandidate(data) {
+      try {
+        // Extract the correct fields from the data
+        const from = data.userId;
+        const candidate = data.candidate;
+
+        if (!from || !candidate) {
+          console.error('Invalid ICE candidate data received:', data);
+          return;
+        }
+
+        console.log(`Received ICE candidate from ${from}:`, candidate);
+
+        const pc = this.peerConnections[from];
+        if (!pc) {
+          console.error(`No peer connection found for ${from} to add ICE candidate`);
+          return;
+        }
+
+        // Only add candidate if we have a remote description
+        if (pc.remoteDescription && pc.remoteDescription.type) {
+          console.log(`Adding ICE candidate for ${from}`);
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          console.log(`ICE candidate added for ${from}`);
+        } else {
+          console.warn(`Skipping ICE candidate - no remote description for ${from} yet`);
+          // Store candidates to add later
+          if (!this._pendingCandidates) this._pendingCandidates = {};
+          if (!this._pendingCandidates[from]) this._pendingCandidates[from] = [];
+          this._pendingCandidates[from].push(candidate);
+        }
+      } catch (error) {
+        console.error('Error handling ICE candidate:', error);
+      }
+    },
+
+    handleUserLeft(userId) {
+      console.log(`Handling user left: ${userId}`);
+
+      // Close and remove peer connection
+      if (this.peerConnections[userId]) {
+        this.peerConnections[userId].close();
+        delete this.peerConnections[userId];
+        console.log(`Closed peer connection to ${userId}`);
+      }
+
+      // Remove remote stream
+      if (this.remoteStreams[userId]) {
+        delete this.remoteStreams[userId];
+        // Force reactivity update
+        this.remoteStreams = { ...this.remoteStreams };
+        console.log(`Removed remote stream for ${userId}`);
+      }
+
+      // Clean up any pending candidates
+      if (this._pendingCandidates && this._pendingCandidates[userId]) {
+        delete this._pendingCandidates[userId];
       }
     },
 
@@ -309,7 +987,7 @@ export default {
       this.isInCall = false;
 
       // Notify other users
-      if (this.socket) {
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         this.socket.send(JSON.stringify({
           type: 'leave-call',
           userId: this.userId
@@ -317,130 +995,96 @@ export default {
       }
     },
 
-    createPeerConnection(remoteUserId: string) {
-      try {
-        // ICE servers configuration (STUN/TURN)
-        const iceServers = [
-          { urls: 'stun:stun.l.google.com:19302' },
-          // Add TURN servers in production for NAT traversal
-        ];
+    connectStatusWebSocket() {
+      // Close existing connection if any
+      if (this.statusSocket) {
+        this.statusSocket.close();
+      }
 
-        const pc = new RTCPeerConnection({ iceServers });
-        this.peerConnections[remoteUserId] = pc;
+      // Create new WebSocket connection
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/user-status/`;
 
-        // Add local tracks to the connection
-        if (this.localStream) {
-          this.localStream.getTracks().forEach(track => {
-            if (this.localStream) {
-              pc.addTrack(track, this.localStream);
-            }
-          });
-        }
+      this.statusSocket = new WebSocket(wsUrl);
 
-        // Handle ICE candidates
-        pc.onicecandidate = (event) => {
-          if (event.candidate && this.socket) {
-            this.socket.send(JSON.stringify({
-              type: 'ice-candidate',
-              candidate: event.candidate,
-              to: remoteUserId,
-              from: this.userId
-            }));
+      this.statusSocket.onopen = () => {
+        console.log('Status WebSocket connected');
+      };
+
+      this.statusSocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        this.handleStatusMessage(data);
+      };
+
+      this.statusSocket.onclose = () => {
+        console.log('Status WebSocket disconnected');
+        // Try to reconnect after a delay
+        setTimeout(() => {
+          if (this.userId) {
+            this.connectStatusWebSocket();
           }
-        };
+        }, 3000);
+      };
 
-        // Handle connection state changes
-        pc.onconnectionstatechange = () => {
-          console.log(`Connection state with ${remoteUserId}:`, pc.connectionState);
-        };
+      this.statusSocket.onerror = (error) => {
+        console.error('Status WebSocket error:', error);
+      };
+    },
 
-        // Handle incoming tracks
-        pc.ontrack = (event) => {
-          console.log('Received remote track from:', remoteUserId);
-          this.remoteStreams[remoteUserId] = event.streams[0];
-          // Force reactivity update
-          this.remoteStreams = { ...this.remoteStreams };
-        };
-
-        return pc;
-      } catch (error) {
-        console.error('Error creating peer connection:', error);
-        return null;
+    handleStatusMessage(data) {
+      if (data.type === 'user_status') {
+        // Update user's online status
+        this.updateUserOnlineStatus(data.user_id, data.is_online);
+      } else if (data.type === 'typing_status') {
+        // Update user's typing status
+        this.updateUserTypingStatus(data.user_id, data.is_typing, data.conversation_id);
       }
     },
 
-    async handleOffer(data: any) {
-      try {
-        const { from, offer } = data;
-
-        // Create peer connection if it doesn't exist
-        let pc = this.peerConnections[from];
-        if (!pc) {
-          pc = this.createPeerConnection(from);
-          if (!pc) return;
+    updateUserOnlineStatus(userId, isOnline) {
+      // Update the users array
+      this.users = this.users.map(user => {
+        if (user.id === userId) {
+          return { ...user, isOnline: isOnline };
         }
+        return user;
+      });
+    },
 
-        // Set remote description
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-
-        // Create answer
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
-        // Send answer
-        if (this.socket) {
-          this.socket.send(JSON.stringify({
-            type: 'answer',
-            answer,
-            to: from,
-            from: this.userId
-          }));
+    updateUserTypingStatus(userId, isTyping, conversationId) {
+      // Update the users array
+      this.users = this.users.map(user => {
+        if (user.id === userId) {
+          return { ...user, is_typing: isTyping };
         }
-      } catch (error) {
-        console.error('Error handling offer:', error);
+        return user;
+      });
+    },
+
+    sendTypingStatus(isTyping, conversationId) {
+      if (this.statusSocket && this.statusSocket.readyState === WebSocket.OPEN) {
+        this.statusSocket.send(JSON.stringify({
+          type: 'typing_status',
+          is_typing: isTyping,
+          conversation_id: conversationId
+        }));
       }
     },
 
-    async handleAnswer(data: any) {
-      try {
-        const { from, answer } = data;
-        const pc = this.peerConnections[from];
+    handleTyping(isTyping) {
+      // Get the current conversation ID
+      const conversationId = this.currentConversationId; // You'll need to track this
 
-        if (pc) {
-          await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        }
-      } catch (error) {
-        console.error('Error handling answer:', error);
-      }
-    },
-
-    async handleIceCandidate(data: any) {
-      try {
-        const { from, candidate } = data;
-        const pc = this.peerConnections[from];
-
-        if (pc) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        }
-      } catch (error) {
-        console.error('Error handling ICE candidate:', error);
-      }
-    },
-
-    handleUserLeft(userId: string) {
-      // Close and remove peer connection
-      if (this.peerConnections[userId]) {
-        this.peerConnections[userId].close();
-        delete this.peerConnections[userId];
-      }
-
-      // Remove remote stream
-      if (this.remoteStreams[userId]) {
-        delete this.remoteStreams[userId];
-        // Force reactivity update
-        this.remoteStreams = { ...this.remoteStreams };
-      }
+      // Send typing status to WebSocket
+      this.sendTypingStatus(isTyping, conversationId);
     }
   }
 }
 </script>
+
+<style scoped>
+/* Add these styles to the bottom of your existing <style> section */
+.cursor-ew-resize {
+  cursor: ew-resize;
+}
+</style>

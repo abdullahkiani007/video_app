@@ -108,6 +108,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Handler for join call
     async def join_call(self, event):
+        print("join_call event: ", event)
         await self.send(text_data=json.dumps(event['data']))
 
     # Handler for leave call
