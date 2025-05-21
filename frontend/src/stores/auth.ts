@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 import api from '@/services/api'
+import userService from '@/services/userService'
+import chatService from '@/services/chatService'
 
 interface User {
   id: string
@@ -79,7 +81,7 @@ export const useAuthStore = defineStore('auth', {
       this.error = null
 
       try {
-        let response = await api.login(credentials)
+        let response = await userService.login(credentials)
 
         // Validate response - Django typically returns token and user data
         if (!response?.data?.access || !response?.data?.refresh) {
@@ -106,7 +108,7 @@ export const useAuthStore = defineStore('auth', {
           }
 
           // Save user to global state
-          let userResponse = await api.getProfile()
+          let userResponse = await userService.getProfile()
 
           this.user = userResponse.data
           localStorage.setItem('user', JSON.stringify(this.user))
@@ -152,7 +154,7 @@ export const useAuthStore = defineStore('auth', {
         let response;
 
         // Django registration endpoint
-        response = await api.register({
+        response = await userService.register({
           first_name: credentials.first_name,
           last_name: credentials.last_name,
           username: credentials.username,

@@ -1,10 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
 
+console.log("routes", routes);
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL || '/'),
   routes: [
     ...routes,
+    {
+      path: '/',
+      name: 'Home',
+      component: () => import('@/pages/index.vue'),
+      meta: {
+        title: 'Home'
+      }
+    },
     {
       path: '/chat',
       name: 'ChatRoom',
@@ -16,6 +25,7 @@ const router = createRouter({
     }
 
   ],
+
   scrollBehavior: (to, from, savedPosition) => {
     // Return savedPosition if it exists (for back/forward navigation)
     if (savedPosition) {

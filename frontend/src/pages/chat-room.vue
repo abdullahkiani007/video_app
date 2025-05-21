@@ -11,7 +11,7 @@
         >
           <div v-for="(stream, userId) in remoteStreams" :key="userId" class="remote-video-container">
             <video
-              :ref="el => { if (el) remoteVideoRefs[userId] = el }"
+              :ref="el => { if (el) remoteVideoRefs[userId] = el as HTMLVideoElement }"
               autoplay
               playsinline
               class="remote-video"
@@ -109,6 +109,8 @@
       <div class="flex-1 overflow-hidden flex flex-col relative">
         <ChatArea
           :messages="messages"
+          :current-user="username"
+          :typing-users="typingUsers"
           @send-message="sendMessage"
           @typing="handleTyping"
           class="flex-1 overflow-y-auto"
@@ -138,8 +140,10 @@ import UserList from '@/components/chat/UserList.vue';
 import VideoGrid from '@/components/chat/VideoGrid.vue';
 import ChatArea from '@/components/chat/ChatArea.vue';
 import CallControls from '@/components/chat/CallControls.vue';
-import api from '@/services/api';
+import chatService from '@/services/chatService';
+import userService from '@/services/userService';
 import { useAuthStore } from '@/stores/auth'; // Import Pinia user store
+import CallService from '@/services/CallService';
 
 export default {
   name: 'ChatRoom',
@@ -151,30 +155,32 @@ export default {
   },
   data() {
     return {
-      users: [],
-      onlineUsers: [],
-      allUsers: [],
-      messages: [],
+      users: [] as any[],
+      onlineUsers: [] as any[],
+      allUsers: [] as any[],
+      messages: [] as any[],
       localStream: null as MediaStream | null,
       remoteStreams: {} as Record<string, MediaStream>,
-      peerConnections: {} as Record<string, RTCPeerConnection>,
       socket: null as WebSocket | null,
       isInCall: false,
       userId: '',
       username: '',
-      _pendingCandidates: {} as Record<string, RTCIceCandidate[]>,
       // New state for sidebar toggles and sizes
       userListOpen: false,
       chatAreaOpen: false,
       isMobile: false,
       userListWidth: 320,
       chatAreaWidth: 380,
-      resizing: null,
+      resizing: null as string | null,
       minSidebarWidth: 250,
       maxSidebarWidth: 600,
-      statusSocket: null,
-      streamCheckInterval: null,
-      remoteVideoRefs: {}
+      statusSocket: null as WebSocket | null,
+      remoteVideoRefs: {} as Record<string, HTMLVideoElement>,
+      callService: null as CallService | null,
+      currentConversationId: '', // Added to track current conversation
+      chatService: null,
+      userService: null,
+      typingUsers: [] as string[]
     }
   },
   created() {
@@ -190,11 +196,25 @@ export default {
       return;
     }
 
+    // Initialize CallService
+    this.callService = new CallService({
+      userId: this.userId,
+      username: this.username,
+      onRemoteStreamAdded: this.handleRemoteStreamAdded,
+      onRemoteStreamRemoved: this.handleRemoteStreamRemoved,
+      onMessageReceived: this.handleMessageReceived,
+      onUserJoined: this.handleUserJoined,
+      onUserLeft: this.handleUserLeft,
+      onUsersUpdated: this.handleUsersUpdated,
+      onTypingStatusChanged: this.handleTypingStatusChanged
+    });
+
     // Fetch initial data
     this.fetchUsers();
     this.fetchMessages();
-    this.connectWebSocket();
-    // this.connectStatusWebSocket();
+
+    // Connect to WebSocket
+    this.callService.connectWebSocket();
 
     // Check if device is mobile
     this.checkIfMobile();
@@ -208,48 +228,98 @@ export default {
     document.addEventListener('mousemove', this.handleResize);
     document.addEventListener('mouseup', this.stopResizing);
 
-    // Add interval to check remote streams
-    this.streamCheckInterval = setInterval(() => {
-      console.log("remote streams ", this.remoteStreams);
-      if (Object.keys(this.remoteStreams).length > 0) {
-        console.log('Remote streams available:', Object.keys(this.remoteStreams));
-        for (const userId in this.remoteStreams) {
-          const stream = this.remoteStreams[userId];
-          console.log(`Stream for user ${userId}:`, {
-            active: stream.active,
-            id: stream.id,
-            tracks: stream.getTracks().map(t => ({
-              kind: t.kind,
-              enabled: t.enabled,
-              muted: t.muted,
-              readyState: t.readyState
-            }))
-          });
-        }
-      }
-    }, 5000);
-
     // Handle autoplay restrictions
     document.addEventListener('click', this.handleUserInteraction, { once: true });
     document.addEventListener('touchstart', this.handleUserInteraction, { once: true });
   },
   beforeUnmount() {
-    this.leaveCall();
-    if (this.socket) {
-      this.socket.close();
+    // Clean up CallService
+    if (this.callService) {
+      this.callService.disconnect();
     }
+
     window.removeEventListener('resize', this.checkIfMobile);
 
     // Remove global event listeners
     document.removeEventListener('mousemove', this.handleResize);
     document.removeEventListener('mouseup', this.stopResizing);
-
-    // Clear interval if it exists
-    if (this.streamCheckInterval) {
-      clearInterval(this.streamCheckInterval);
-    }
   },
   methods: {
+    // New methods for CallService integration
+    handleRemoteStreamAdded(userId: string, stream: MediaStream) {
+      console.log(`Remote stream added for user ${userId}`);
+      this.remoteStreams[userId] = stream;
+      // Force reactivity update
+      this.remoteStreams = { ...this.remoteStreams };
+
+      // Try to play the video immediately if element exists
+      this.$nextTick(() => {
+        const videoEl = this.remoteVideoRefs[userId];
+        if (videoEl) {
+          videoEl.srcObject = stream;
+          videoEl.play().catch(err => {
+            console.warn(`Could not play remote video for ${userId}:`, err);
+          });
+        }
+      });
+    },
+
+    handleRemoteStreamRemoved(userId: string) {
+      console.log(`Remote stream removed for user ${userId}`);
+      delete this.remoteStreams[userId];
+      // Force reactivity update
+      this.remoteStreams = { ...this.remoteStreams };
+    },
+
+    handleMessageReceived(message: any) {
+      this.messages.push(message);
+    },
+
+    handleUserJoined(userId: string) {
+      console.log(`User ${userId} joined the call`);
+      // Update user status in the UI if needed
+    },
+
+    handleUserLeft(userId: string) {
+      console.log(`User ${userId} left the call`);
+      // Update user status in the UI if needed
+    },
+
+    handleUsersUpdated(users: any[]) {
+      // Update online users from WebSocket
+      this.onlineUsers = users || [];
+      // Mark online status in allUsers
+      this.updateUserStatus();
+    },
+
+    handleTypingStatusChanged(userId: string, isTyping: boolean, conversationId: string) {
+      console.log(`User ${userId} is ${isTyping ? 'typing' : 'not typing'} in conversation ${conversationId}`);
+
+
+      // Find the username for this user ID
+      const user = this.users.find(user => user.id === userId);
+      const username = user ? user.username : `User ${userId}`;
+
+      // Update typing users array
+      if (isTyping) {
+        // Add user to typing users if not already there
+        if (!this.typingUsers.includes(username)) {
+          this.typingUsers.push(username);
+        }
+      } else {
+        // Remove user from typing users
+        this.typingUsers = this.typingUsers.filter(name => name !== username);
+      }
+
+      // Also update the users array for UI consistency
+      this.users = this.users.map(user => {
+        if (user.id === userId) {
+          return { ...user, is_typing: isTyping };
+        }
+        return user;
+      });
+    },
+
     // New methods for sidebar functionality
     toggleUserList() {
       this.userListOpen = !this.userListOpen;
@@ -278,7 +348,7 @@ export default {
       }
     },
 
-    // New methods for sidebar resizing
+    // Methods for sidebar resizing
     loadSavedSidebarWidths() {
       try {
         // Load user list width
@@ -303,14 +373,14 @@ export default {
       }
     },
 
-    startResizing(sidebar, event) {
+    startResizing(sidebar: string, event: MouseEvent) {
       if (this.isMobile) return; // Disable resizing on mobile
 
       this.resizing = sidebar;
       event.preventDefault();
     },
 
-    handleResize(event) {
+    handleResize(event: MouseEvent) {
       if (!this.resizing) return;
 
       const windowWidth = window.innerWidth;
@@ -356,7 +426,7 @@ export default {
 
     async fetchUsers() {
       try {
-        const response = await api.getUsers();
+        const response = await userService.getUsers();
         console.log("response " , response)
 
         if (response.status !== 200) {
@@ -380,7 +450,7 @@ export default {
 
     async fetchMessages() {
       try {
-        const response = await api.getMessages();
+        const response = await chatService.getMessages();
 
         if (response.status !== 200) {
           throw new Error(`Failed to fetch messages: ${response.status}`);
@@ -391,134 +461,6 @@ export default {
         console.error('Error fetching messages:', error);
         // Set empty array as fallback
         this.messages = [];
-      }
-    },
-
-    connectWebSocket() {
-      try {
-        // Get the base WebSocket URL from environment or use default
-        const baseWsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
-        // Connect to the global chat room
-        this.socket = new WebSocket(`${baseWsUrl}/ws/chat/global/`);
-
-        this.socket.onopen = () => {
-          console.log('WebSocket connected');
-          // Send join room message
-          if (this.socket) {
-            this.socket.send(JSON.stringify({
-              type: 'join',
-              userId: this.userId,
-              username: this.username
-            }));
-          }
-        };
-
-        this.socket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log('WebSocket message received:', data); // Log all incoming messages
-            this.handleSocketMessage(data);
-          } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
-          }
-        };
-
-        this.socket.onerror = (error) => {
-          console.error('WebSocket error:', error);
-        };
-
-        this.socket.onclose = () => {
-          console.log('WebSocket disconnected');
-        };
-      } catch (error) {
-        console.error('Failed to connect WebSocket:', error);
-      }
-    },
-
-    handleSocketMessage(data: any) {
-      if (!data) {
-        console.error('Received empty WebSocket message');
-        return;
-      }
-
-      console.log('Received WebSocket message:', data.type);
-
-      switch (data.type) {
-        case 'users':
-          // Update online users from WebSocket
-          this.onlineUsers = data.users || [];
-          // Mark online status in allUsers
-          this.updateUserStatus();
-          break;
-        case 'message':
-          // Transform incoming message to match expected format
-          const formattedMessage = {
-            id: data.id || Date.now(), // Use server-provided ID or fallback
-            sender: data.userId,
-            sender_username: data.username,
-            content: data.text,
-            created_at: data.timestamp || new Date().toISOString()
-          };
-          this.messages.push(formattedMessage);
-          break;
-
-          case 'typing':
-          // Handle typing status updates from other users
-          console.log(`User ${data.userId} (${data.username}) is ${data.isTyping ? 'typing' : 'not typing'}`);
-          if (data.userId !== this.userId) {  // Don't process our own typing events
-            this.updateUserTypingStatus(data.userId, data.isTyping, 'global');
-          }
-          break;
-
-        case 'join-call':
-          console.log(`User ${data.userId} joined the call`);
-
-          // If another user joined the call and we're already in the call,
-          // we should initiate the connection to them
-          if (data.userId !== this.userId && this.isInCall) {
-            console.log(`We're already in call, initiating connection to new user ${data.userId}`);
-
-            // Create peer connection if it doesn't exist
-            if (!this.peerConnections[data.userId]) {
-              this.createPeerConnection(data.userId);
-            }
-
-            // Create and send offer - we initiate because we were already in the call
-            this.createOfferToUser(data.userId);
-          }
-          break;
-        case 'leave-call':
-          this.handleUserLeft(data.userId);
-          break;
-        case 'offer':
-          // Only process offers meant for us
-          if (data.targetUserId === this.userId) {
-            this.handleOffer(data);
-          } else {
-            console.log(`Ignoring offer not meant for us (target: ${data.targetUserId})`);
-          }
-          break;
-        case 'answer':
-          // Only process answers meant for us
-          if (data.targetUserId === this.userId) {
-            this.handleAnswer(data);
-          } else {
-            console.log(`Ignoring answer not meant for us (target: ${data.targetUserId})`);
-          }
-          break;
-        case 'ice-candidate':
-          // Only process ICE candidates meant for us
-          if (data.targetUserId === this.userId) {
-            this.handleIceCandidate(data);
-          } else {
-            console.log(`Ignoring ICE candidate not meant for us (target: ${data.targetUserId})`);
-          }
-          break;
-        case 'user-left':
-          this.handleUserLeft(data.userId);
-          break;
-        default:
-          console.log('Unknown message type:', data.type);
       }
     },
 
@@ -537,685 +479,76 @@ export default {
     },
 
     sendMessage(text: string) {
-      if (!text.trim() || !this.socket) return;
-
-      // Make sure userId and username are not empty
-      if (!this.userId || !this.username) {
-        console.error('Cannot send message: User ID or username is missing');
-        return;
-      }
-
-      // Check socket readiness
-      if (this.socket.readyState !== WebSocket.OPEN) {
-        console.error('Cannot send message: WebSocket is not connected');
-        return;
-      }
-
-      const message = {
-        type: 'message',
-        userId: this.userId,
-        username: this.username,
-        text: text.trim(),
-        timestamp: new Date().toISOString()
-      };
-
-      try {
-        this.socket.send(JSON.stringify(message));
-
-        // Don't add message to local array here - wait for server confirmation
-        // The message will be added when received back from the server
-      } catch (error) {
-        console.error('Error sending message:', error);
+      if (!text.trim()) return;
+      if (this.callService) {
+        this.callService.sendMessage(text);
       }
     },
 
     async joinCall() {
       try {
-        console.log("joining call");
-        console.log("this.userId ", this.userId);
-
-        // Check if we're in Firefox
-        const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-
-        let videoStream;
-
-        if (isFirefox) {
-          // Firefox fallback: use getUserMedia directly
-          try {
-            // Try to get a video stream from the camera
-            videoStream = await navigator.mediaDevices.getUserMedia({
-              video: true,
-              audio: true
-            });
-            console.log("Using camera stream for Firefox");
-          } catch (err) {
-            console.warn('Could not access camera in Firefox:', err);
-            // Create a canvas-based fallback if camera access fails
-            const canvas = document.createElement('canvas');
-            canvas.width = 640;
-            canvas.height = 480;
-            const ctx = canvas.getContext('2d');
-
-            // Draw a simple placeholder
-            if (ctx) {
-              ctx.fillStyle = '#333333';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.fillStyle = 'white';
-              ctx.font = '24px Arial';
-              ctx.fillText(`${this.username}`, 20, 40);
-              ctx.fillText('Video unavailable', 20, 80);
-            }
-
-            // Get stream from canvas
-            videoStream = canvas.captureStream(30); // 30 FPS
-
-            // Add audio if possible
-            try {
-              const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-              audioStream.getAudioTracks().forEach(track => videoStream.addTrack(track));
-            } catch (e) {
-              console.warn('Could not add audio to canvas stream:', e);
-            }
-
-            console.log("Using canvas fallback stream for Firefox");
-          }
-        } else {
-          // Chrome and other browsers: use video file as before
-          const videoElement = document.createElement('video');
-          videoElement.src = 'src/assets/video.webm'; // Adjust path if needed
-          videoElement.loop = true;
-          videoElement.muted = true;
-
-          // Wait for video to be loaded before capturing
-          await new Promise((resolve) => {
-            videoElement.onloadedmetadata = resolve;
-            videoElement.load();
-          });
-
-          // Start playing the video (needed for captureStream)
-          await videoElement.play().catch(err => {
-            console.error('Error playing video:', err);
-            throw new Error('Could not play video file');
-          });
-
-          // Capture stream from the video element
-          videoStream = videoElement.captureStream();
-
-          // Add audio track if possible
-          try {
-            const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            audioStream.getAudioTracks().forEach(track => videoStream.addTrack(track));
-          } catch (e) {
-            console.warn('Could not add audio to video stream:', e);
-          }
-
-          console.log("Using video file stream");
+        if (!this.callService) {
+          throw new Error('Call service not initialized');
         }
 
-        this.localStream = videoStream;
+        // Join call using CallService
+        this.localStream = await this.callService.joinCall();
         this.isInCall = true;
 
-        // Display local video
-        if (this.$refs.localVideo) {
-          this.$refs.localVideo.srcObject = this.localStream;
+        // Find users already in call to connect to
+        const usersInCall = this.users.filter(user =>
+          user.inCall && user.userId !== this.userId
+        );
+
+        // Connect to existing users in call
+        if (usersInCall.length > 0) {
+          setTimeout(() => {
+            if (this.callService) {
+              this.callService.connectToExistingUsers(usersInCall.map(user => user.userId));
+            }
+          }, 1000);
         }
-
-        // Notify others that you've joined
-        console.log("Sending join-call message to WebSocket");
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-          this.socket.send(JSON.stringify({
-            type: 'join-call',
-            userId: this.userId,
-            username: this.username
-          }));
-          console.log("Sent join-call message");
-        } else {
-          console.error('WebSocket not connected, cannot send join-call message');
-          return;
-        }
-
-        // Add a delay to ensure the join-call message is processed first
-        setTimeout(() => {
-          // Find all users who are already in the call
-          // We need to initiate connections to all users already in the call
-          const usersInCall = this.users.filter(user =>
-            user.inCall && user.userId !== this.userId
-          );
-          console.log("usersInCall ", usersInCall);
-          console.log("this.users ", this.users);
-          console.log("this.userId ", this.userId);
-          console.log("this.peerConnections ", this.peerConnections);
-
-          if (usersInCall.length > 0) {
-            console.log(`Creating offers to ${usersInCall.length} users already in call`);
-            usersInCall.forEach(user => {
-              console.log("user ", user);
-              // Create peer connection if it doesn't exist
-              if (!this.peerConnections[user.userId]) {
-                this.createPeerConnection(user.userId);
-              }
-              // Create and send offer
-              this.createOfferToUser(user.userId);
-            });
-          } else {
-            console.log("No other users in call to connect to");
-          }
-        }, 1000);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error joining call:', error);
         alert('Failed to join call: ' + (error.message || 'Unknown error'));
       }
     },
 
-    async createOfferToUser(userId) {
-      console.log(`Creating offer to user ${userId}`);
-
-      // Create peer connection if it doesn't exist
-      if (!this.peerConnections[userId]) {
-        this.createPeerConnection(userId);
-      }
-
-      try {
-        const pc = this.peerConnections[userId];
-
-        // Check if connection is in a valid state to create an offer
-        if (pc.signalingState === 'stable') {
-          // Create offer
-          const offer = await pc.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: true
-          });
-
-          await pc.setLocalDescription(offer);
-
-          // Send the offer to the remote peer
-          if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify({
-              type: 'offer',
-              userId: this.userId,
-              targetUserId: userId,  // Make sure this is the correct recipient
-              sdp: pc.localDescription
-            }));
-            console.log(`Sent offer to user ${userId}`);
-          } else {
-            console.error('WebSocket not connected, cannot send offer');
-          }
-        } else {
-          console.warn(`Cannot create offer - peer connection is in ${pc.signalingState} state`);
-        }
-      } catch (error) {
-        console.error(`Error creating offer to user ${userId}:`, error);
-      }
-    },
-
-    createPeerConnection(remoteUserId) {
-      console.log(`Creating new peer connection to ${remoteUserId}`);
-
-      // Create RTCPeerConnection with ICE servers
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          // { urls: 'stun:stun1.l.google.com:19302' },
-          // { urls: 'stun:stun2.l.google.com:19302' },
-          // { urls: 'stun:stun3.l.google.com:19302' },
-          // { urls: 'stun:stun4.l.google.com:19302' }
-        ]
-      });
-
-
-      this.peerConnections[remoteUserId] = pc;
-      console.log("pc ", pc);
-
-      // Add all local tracks to the connection if we're in a call
-      if (this.isInCall && this.localStream) {
-        this.localStream.getTracks().forEach(track => {
-          console.log(`Adding ${track.kind} track to peer connection for ${remoteUserId}`);
-          pc.addTrack(track, this.localStream);
-        });
-      } else {
-        console.log('Not adding local tracks - either not in call or no local stream');
-        console.log('isInCall:', this.isInCall);
-        console.log('localStream exists:', !!this.localStream);
-      }
-
-      console.log("pc after adding tracks", pc);
-
-      // Handle incoming tracks
-      pc.ontrack = (event) => {
-        console.log(`Received track from ${remoteUserId}:`, event.track.kind);
-
-        // Ensure track is enabled
-        if (!event.track.enabled) {
-          console.log(`Enabling ${event.track.kind} track from ${remoteUserId}`);
-          event.track.enabled = true;
-        }
-
-        // Create a new MediaStream if it doesn't exist for this user
-        if (!this.remoteStreams[remoteUserId]) {
-          console.log("creating new remote stream for ", remoteUserId);
-          this.remoteStreams[remoteUserId] = new MediaStream();
-          // Force reactivity update
-          this.remoteStreams = { ...this.remoteStreams };
-        }
-
-        // Add the track to the remote stream
-        this.remoteStreams[remoteUserId].addTrack(event.track);
-
-        // Force reactivity update again after adding track
-        this.remoteStreams = { ...this.remoteStreams };
-
-        console.log(`Added ${event.track.kind} track to remote stream for ${remoteUserId}`);
-        console.log(`Current remote streams:`, Object.keys(this.remoteStreams));
-
-        // Try to play the video immediately if element exists
-        this.$nextTick(() => {
-          const videoEl = this.remoteVideoRefs[remoteUserId];
-          if (videoEl) {
-            videoEl.srcObject = this.remoteStreams[remoteUserId];
-            videoEl.play().catch(err => {
-              console.warn(`Could not play remote video for ${remoteUserId}:`, err);
-            });
-          }
-        });
-      };
-
-      // Handle ICE candidates
-      pc.onicecandidate = (event) => {
-        console.log("onicecandidate ", event);
-        if (event.candidate) {
-          console.log(`Generated ICE candidate for ${remoteUserId}`);
-
-          // Send the ICE candidate to the remote peer
-          if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify({
-              type: 'ice-candidate',
-              userId: this.userId,
-              targetUserId: remoteUserId,
-              candidate: event.candidate
-            }));
-            console.log(`Sent ICE candidate to ${remoteUserId}`);
-          } else {
-            console.error('WebSocket not connected, cannot send ICE candidate');
-          }
-        }
-      };
-
-      // Log connection state changes
-      pc.onconnectionstatechange = () => {
-        console.log(`Connection state for ${remoteUserId} changed to: ${pc.connectionState}`);
-        if (pc.connectionState === 'connected') {
-          console.log(`Successfully connected to ${remoteUserId}`);
-        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
-          console.warn(`Connection to ${remoteUserId} ${pc.connectionState}`);
-
-          // Clean up failed connections
-          if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-            this.handleUserLeft(remoteUserId);
-
-            // If still in call, try to reconnect after a delay
-            if (this.isInCall) {
-              setTimeout(() => {
-                if (this.isInCall) {
-                  console.log(`Attempting to reconnect to ${remoteUserId}`);
-                  this.createPeerConnection(remoteUserId);
-                  this.createOfferToUser(remoteUserId);
-                }
-              }, 2000);
-            }
-          }
-        }
-      };
-
-      // Log ICE connection state changes
-      pc.oniceconnectionstatechange = () => {
-        console.log(`ICE connection state for ${remoteUserId} changed to: ${pc.iceConnectionState}`);
-
-        // Handle ICE connection failures
-        if (pc.iceConnectionState === 'failed') {
-          console.warn(`ICE connection to ${remoteUserId} failed, attempting ICE restart`);
-
-          // Try ICE restart if connection fails
-          if (pc.restartIce) {
-            pc.restartIce();
-          } else if (this.isInCall) {
-            // Fallback: recreate the connection
-            this.handleUserLeft(remoteUserId);
-            setTimeout(() => {
-              if (this.isInCall) {
-                this.createPeerConnection(remoteUserId);
-                this.createOfferToUser(remoteUserId);
-              }
-            }, 1000);
-          }
-        }
-      };
-
-      return pc;
-    },
-
-    async handleOffer(data) {
-      try {
-        console.log("handleOffer ", data);
-        // Extract the correct fields from the data
-        const from = data.userId;
-        const offer = data.sdp;
-
-        if (!from || !offer) {
-          console.error('Invalid offer data received:', data);
-          return;
-        }
-
-        console.log(`Received offer from ${from}:`, offer);
-
-        // Create peer connection if it doesn't exist
-        let pc = this.peerConnections[from];
-        console.log("pc ", pc);
-        if (!pc) {
-          console.log(`Creating new peer connection for offer from ${from}`);
-          pc = this.createPeerConnection(from);
-          if (!pc) {
-            console.error(`Failed to create peer connection for ${from}`);
-            return;
-          }
-        }
-
-        // Initialize pending candidates array if needed
-        if (!this._pendingCandidates) this._pendingCandidates = {};
-        if (!this._pendingCandidates[from]) this._pendingCandidates[from] = [];
-
-        // Set remote description
-        console.log(`Setting remote description for ${from}`);
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        console.log(`Remote description set for ${from}`);
-
-        // Add local tracks if in call and not already added
-        if (this.isInCall && this.localStream) {
-          const senders = pc.getSenders();
-          const tracksToAdd = this.localStream.getTracks().filter(track =>
-            !senders.some(sender => sender.track === track)
-          );
-
-          for (const track of tracksToAdd) {
-            console.log(`Adding ${track.kind} track to peer connection for ${from} after receiving offer`);
-            pc.addTrack(track, this.localStream);
-          }
-        }
-
-        // Create answer
-        console.log(`Creating answer for ${from}`);
-        const answer = await pc.createAnswer();
-        console.log(`Answer created for ${from}:`, answer);
-
-        await pc.setLocalDescription(answer);
-        console.log(`Local description (answer) set for ${from}`);
-
-        // Send answer
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-          console.log(`Sending answer to ${from}`);
-          this.socket.send(JSON.stringify({
-            type: 'answer',
-            userId: this.userId,
-            targetUserId: from,
-            sdp: pc.localDescription
-          }));
-          console.log(`Answer sent to ${from}`);
-        } else {
-          console.error('WebSocket not connected, cannot send answer');
-        }
-
-        // Apply any pending ICE candidates
-        if (this._pendingCandidates[from] && this._pendingCandidates[from].length > 0) {
-          console.log(`Applying ${this._pendingCandidates[from].length} pending ICE candidates for ${from}`);
-          for (const candidate of this._pendingCandidates[from]) {
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(candidate));
-              console.log(`Successfully added pending ICE candidate for ${from}`);
-            } catch (err) {
-              console.warn(`Failed to add pending ICE candidate for ${from}:`, err);
-            }
-          }
-          // Clear the pending candidates after applying them
-          this._pendingCandidates[from] = [];
-        }
-      } catch (error) {
-        console.error('Error handling offer:', error);
-      }
-    },
-
-    async handleAnswer(data) {
-      try {
-        // Extract the correct fields from the data
-        const from = data.userId;
-        const answer = data.sdp;
-
-        if (!from || !answer) {
-          console.error('Invalid answer data received:', data);
-          return;
-        }
-
-        console.log(`Received answer from ${from}:`, answer);
-
-        const pc = this.peerConnections[from];
-        if (!pc) {
-          console.error(`No peer connection found for ${from}`);
-          return;
-        }
-
-        // Check if we can set the remote description
-        if (pc.signalingState === 'have-local-offer') {
-          console.log(`Setting remote description (answer) for ${from}`);
-          await pc.setRemoteDescription(new RTCSessionDescription(answer));
-          console.log(`Remote description (answer) set for ${from}`);
-
-          // Apply any pending ICE candidates
-          if (this._pendingCandidates && this._pendingCandidates[from]) {
-            console.log(`Applying ${this._pendingCandidates[from].length} pending ICE candidates for ${from}`);
-            for (const candidate of this._pendingCandidates[from]) {
-              try {
-                await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                console.log(`Successfully added pending ICE candidate for ${from}`);
-              } catch (err) {
-                console.warn(`Failed to add pending ICE candidate for ${from}:`, err);
-              }
-            }
-            // Clear the pending candidates after applying them
-            this._pendingCandidates[from] = [];
-          }
-        } else {
-          console.warn(`Cannot set remote description in state: ${pc.signalingState}`);
-
-          // If we're in stable state, we might have already processed this answer
-          // or there might be a race condition - log it but don't treat as error
-          if (pc.signalingState === 'stable') {
-            console.log(`Connection already stable with ${from}, ignoring duplicate answer`);
-          }
-        }
-      } catch (error) {
-        console.error('Error handling answer:', error);
-      }
-    },
-
-    async handleIceCandidate(data) {
-      try {
-        // Extract the correct fields from the data
-        const from = data.userId;
-        const candidate = data.candidate;
-
-        if (!from || !candidate) {
-          console.error('Invalid ICE candidate data received:', data);
-          return;
-        }
-
-        console.log(`Received ICE candidate from ${from}:`, candidate);
-
-        const pc = this.peerConnections[from];
-        if (!pc) {
-          console.error(`No peer connection found for ${from} to add ICE candidate`);
-          return;
-        }
-
-        // Initialize pending candidates array if needed
-        if (!this._pendingCandidates) this._pendingCandidates = {};
-        if (!this._pendingCandidates[from]) this._pendingCandidates[from] = [];
-
-        // Only add candidate if we have a remote description
-        if (pc.remoteDescription && pc.remoteDescription.type) {
-          try {
-            console.log(`Adding ICE candidate for ${from}`);
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
-            console.log(`ICE candidate added for ${from}`);
-          } catch (err) {
-            console.warn(`Failed to add ICE candidate for ${from}:`, err);
-            // Store failed candidates too, in case we need to retry
-            this._pendingCandidates[from].push(candidate);
-          }
-        } else {
-          console.warn(`Storing ICE candidate - no remote description for ${from} yet`);
-          // Store candidates to add later
-          this._pendingCandidates[from].push(candidate);
-        }
-      } catch (error) {
-        console.error('Error handling ICE candidate:', error);
-      }
-    },
-
-    handleUserLeft(userId) {
-      console.log(`Handling user left: ${userId}`);
-
-      // Close and remove peer connection
-      if (this.peerConnections[userId]) {
-        this.peerConnections[userId].close();
-        delete this.peerConnections[userId];
-        console.log(`Closed peer connection to ${userId}`);
-      }
-
-      // Remove remote stream
-      if (this.remoteStreams[userId]) {
-        delete this.remoteStreams[userId];
-        // Force reactivity update
-        this.remoteStreams = { ...this.remoteStreams };
-        console.log(`Removed remote stream for ${userId}`);
-      }
-
-      // Clean up any pending candidates
-      if (this._pendingCandidates && this._pendingCandidates[userId]) {
-        delete this._pendingCandidates[userId];
-      }
-    },
-
     leaveCall() {
-      // Close all peer connections
-      Object.values(this.peerConnections).forEach(pc => pc.close());
-      this.peerConnections = {};
-
-      // Stop all tracks in local stream
-      if (this.localStream) {
-        this.localStream.getTracks().forEach(track => track.stop());
+      if (this.callService) {
+        this.callService.leaveCall();
         this.localStream = null;
-      }
-
-      // Clear remote streams
-      this.remoteStreams = {};
-      this.isInCall = false;
-
-      // Notify other users
-      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        this.socket.send(JSON.stringify({
-          type: 'leave-call',
-          userId: this.userId
-        }));
+        this.isInCall = false;
+        this.remoteStreams = {};
       }
     },
 
-    connectStatusWebSocket() {
-      try {
-        // Close existing connection if any
-        if (this.statusSocket) {
-          this.statusSocket.close();
+    getUsernameById(userId: string) {
+      const user = this.users.find(u => u.userId === parseInt(userId));
+      return user ? user.username : `User ${userId}`;
+    },
+
+    handleUserInteraction() {
+      console.log('User interaction detected, attempting to play all videos');
+
+      // Try to play all remote videos
+      for (const userId in this.remoteVideoRefs) {
+        const videoEl = this.remoteVideoRefs[userId];
+        if (videoEl && videoEl.paused) {
+          videoEl.play().catch(err => {
+            console.warn(`Could not play remote video for ${userId}:`, err);
+          });
         }
-
-        // Get the base WebSocket URL from environment or use default
-        const baseWsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
-        // Connect to the user status endpoint
-        const wsUrl = `${baseWsUrl}/ws/user-status/`;
-
-        console.log(`Connecting to status WebSocket at ${wsUrl}`);
-        this.statusSocket = new WebSocket(wsUrl);
-
-        this.statusSocket.onopen = () => {
-          console.log('Status WebSocket connected');
-        };
-
-        this.statusSocket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            this.handleStatusMessage(data);
-          } catch (error) {
-            console.error('Error parsing status WebSocket message:', error);
-          }
-        };
-
-        this.statusSocket.onclose = (event) => {
-          console.log(`Status WebSocket disconnected (code: ${event.code}, reason: ${event.reason})`);
-          // Try to reconnect after a delay, but only if not intentionally closed
-          if (event.code !== 1000) {
-            setTimeout(() => {
-              if (this.userId) {
-                console.log('Attempting to reconnect status WebSocket...');
-                // this.connectStatusWebSocket();
-              }
-            }, 5000); // 5 second delay before reconnecting
-          }
-        };
-
-        this.statusSocket.onerror = (error) => {
-          console.error('Status WebSocket error:', error);
-        };
-      } catch (error) {
-        console.error('Failed to connect status WebSocket:', error);
-        // Schedule retry
-        setTimeout(() => {
-          if (this.userId) {
-            console.log('Retrying status WebSocket connection...');
-            // this.connectStatusWebSocket();
-          }
-        }, 5000);
       }
     },
 
-    handleStatusMessage(data) {
-      if (data.type === 'user_status') {
-        // Update user's online status
-        this.updateUserOnlineStatus(data.user_id, data.is_online);
-      } else if (data.type === 'typing_status') {
-        // Update user's typing status
-        this.updateUserTypingStatus(data.user_id, data.is_typing, data.conversation_id);
+    handleTyping(isTyping: boolean) {
+      if (this.callService) {
+        this.callService.sendTypingStatus(isTyping);
       }
     },
 
-    updateUserOnlineStatus(userId, isOnline) {
-      // Update the users array
-      this.users = this.users.map(user => {
-        if (user.id === userId) {
-          return { ...user, isOnline: isOnline };
-        }
-        return user;
-      });
-    },
-
-    updateUserTypingStatus(userId, isTyping, conversationId) {
-      console.log(`User ${userId} is ${isTyping ? 'typing' : 'not typing'} in conversation ${conversationId}`);
-
-      // Update the users array
-      this.users = this.users.map(user => {
-        if (user.id === userId) {
-          return { ...user, is_typing: isTyping };
-        }
-        return user;
-      });
-    },
-
-    sendTypingStatus(isTyping, conversationId) {
+    sendTypingStatus(isTyping: boolean, conversationId: string) {
       console.log(`Sending typing status: ${isTyping} for conversation ${conversationId}`);
 
       if (this.statusSocket && this.statusSocket.readyState === WebSocket.OPEN) {
@@ -1226,40 +559,6 @@ export default {
         }));
       } else {
         console.warn('Status WebSocket not connected, cannot send typing status');
-      }
-    },
-
-    handleTyping(isTyping) {
-      // Get the current conversation ID
-      const conversationId = this.currentConversationId; // You'll need to track this
-
-      // Send typing status to WebSocket
-      this.sendTypingStatus(isTyping, conversationId);
-    },
-
-    getUsernameById(userId) {
-      const user = this.users.find(u => u.userId === parseInt(userId));
-      return user ? user.username : `User ${userId}`;
-    },
-
-    handleUserInteraction() {
-      console.log('User interaction detected, attempting to play all videos');
-
-      // Try to play local video if it exists
-      if (this.$refs.localVideo && this.$refs.localVideo.paused) {
-        this.$refs.localVideo.play().catch(err => {
-          console.warn('Could not play local video:', err);
-        });
-      }
-
-      // Try to play all remote videos
-      for (const userId in this.remoteVideoRefs) {
-        const videoEl = this.remoteVideoRefs[userId];
-        if (videoEl && videoEl.paused) {
-          videoEl.play().catch(err => {
-            console.warn(`Could not play remote video for ${userId}:`, err);
-          });
-        }
       }
     }
   },
@@ -1291,6 +590,195 @@ export default {
 }
 </script>
 
+<style scoped>
+.chat-room {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f0f0f0;
+  overflow: hidden;
+}
+
+.main-content {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.video-grid {
+  flex-grow: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+  background-color: #e0e0e0;
+  overflow-y: auto;
+}
+
+.video-grid-item {
+  width: 300px;
+  height: 200px;
+  margin: 10px;
+  background-color: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.video-grid-item video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-grid-item .username {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 5px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.sidebar {
+  width: 320px;
+  background-color: #fff;
+  border-left: 1px solid #e0e0e0;
+  overflow-y: auto;
+  transition: width 0.3s ease;
+}
+
+.sidebar.open {
+  width: 320px;
+}
+
+.sidebar.closed {
+  width: 0;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  background-color: #f0f0f0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.sidebar-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.sidebar-header button {
+  background-color: #007aff;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sidebar-content {
+  padding: 10px;
+}
+
+.chat-area {
+  width: 380px;
+  background-color: #fff;
+  border-left: 1px solid #e0e0e0;
+  overflow-y: auto;
+  transition: width 0.3s ease;
+}
+
+.chat-area.open {
+  width: 380px;
+}
+
+.chat-area.closed {
+  width: 0;
+}
+
+.chat-area-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  background-color: #f0f0f0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.chat-area-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.chat-area-header button {
+  background-color: #007aff;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.chat-area-content {
+  padding: 10px;
+}
+
+.resizer {
+  width: 5px;
+  background-color: #e0e0e0;
+  cursor: col-resize;
+  user-select: none;
+}
+
+.resizer.active {
+  background-color: #007aff;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .video-grid {
+    flex-grow: 1;
+    overflow-y: auto;
+  }
+
+  .sidebar,
+  .chat-area {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .sidebar.open,
+  .chat-area.open {
+    width: 100%;
+  }
+
+  .sidebar.closed,
+  .chat-area.closed {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+
+  .resizer {
+    display: none;
+  }
+}
+</style>
 <style scoped>
 /* Add these styles to the bottom of your existing <style> section */
 .cursor-ew-resize {

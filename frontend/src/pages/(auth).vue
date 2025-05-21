@@ -6,7 +6,15 @@
   </div>
 </template>
 
-<script setup>
+<script>
+export default {
+  name: 'AuthLayout',
+  created() {
+    if (!this.$route.path.includes('/auth')) {
+      console.warn('Auth layout loaded for non-auth route:', this.$route.path);
+    }
+  }
+}
 </script>
 
 <style>
