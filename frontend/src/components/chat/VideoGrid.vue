@@ -1,5 +1,13 @@
 <template>
-  <div class="grid gap-4 w-full h-full" :class="gridClass">
+  <div class="grid gap-4 w-full h-full relative" :class="gridClass">
+    <!-- Futuristic grid background -->
+    <div class="absolute inset-0 z-0 opacity-5">
+      <div class="grid-bg"></div>
+    </div>
+    <!-- Subtle glowing orbs -->
+    <div class="absolute top-20 left-20 w-64 h-64 rounded-full bg-cyan-500 opacity-5 blur-[100px]"></div>
+    <div class="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-purple-500 opacity-5 blur-[100px]"></div>
+
     <!-- Debug info (remove in production) -->
     <div v-if="false" class="absolute top-0 left-0 bg-black/70 text-white p-1 text-xs z-50">
       Total participants: {{ totalParticipants }}<br>
@@ -8,7 +16,7 @@
 
     <!-- Fullscreen video overlay -->
     <div v-if="fullscreenVideo"
-         class="fixed inset-0 bg-black z-50 flex justify-center items-center"
+         class="fixed inset-0 bg-gray-950 z-50 flex justify-center items-center"
          @click="exitFullscreen">
       <div class="absolute top-4 right-4 z-10">
         <button @click.stop="exitFullscreen"
@@ -45,20 +53,20 @@
     </div>
 
     <!-- Empty state - no participants -->
-    <div v-if="totalParticipants === 0" class="flex justify-center items-center h-full text-gray-400 text-lg">
-      <div class="text-center p-8 bg-gray-800/30 rounded-xl max-w-md">
+    <div v-if="totalParticipants === 0" class="flex justify-center items-center h-full text-gray-400 text-lg relative z-10">
+      <div class="text-center p-8 bg-gray-800/30 backdrop-blur-sm rounded-xl max-w-md border border-gray-700/50">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>
-        <p class="text-xl font-medium">No participants in the call</p>
-        <p class="mt-2 text-gray-500">Waiting for others to join...</p>
+        <p class="text-xl font-medium text-white">No participants in the call</p>
+        <p class="mt-2 text-gray-400">Waiting for others to join...</p>
       </div>
     </div>
 
     <!-- Single participant (just local stream) -->
     <div v-else-if="totalParticipants === 1 && localStream && Object.keys(validRemoteStreams).length === 0"
-         class="flex justify-center items-center h-full">
-      <div class="relative bg-gray-800 rounded-xl overflow-hidden shadow-lg max-w-2xl w-full mx-auto aspect-video">
+         class="flex justify-center items-center h-full relative z-10">
+      <div class="relative bg-gray-800/60 backdrop-blur-sm rounded-xl overflow-hidden shadow-lg max-w-2xl w-full mx-auto aspect-video border border-gray-700/50 group">
         <video
           ref="localVideo"
           :srcObject.prop="localStream"
@@ -67,6 +75,7 @@
           muted
           class="w-full h-full object-cover"
         ></video>
+        <div class="absolute inset-0 bg-gradient-to-r from-cyan-900/10 to-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         <div class="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-white text-sm font-medium flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />

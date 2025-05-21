@@ -34,7 +34,7 @@
       <div class="absolute top-4 left-4 z-30">
         <button
           @click="toggleSidebar"
-          class="bg-gray-800/80 backdrop-blur-sm text-white p-3 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-lg"
+          class="bg-gray-800/80 backdrop-blur-sm text-white p-3 rounded-full hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all shadow-lg"
           title="Toggle Sidebar"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -66,7 +66,7 @@
       @send-message="sendMessage"
       @typing="handleTyping"
       @logout="logout"
-      @start-resize="startResizing"
+      @resize="handleSidebarResize"
       class="z-40 shadow-xl"
     />
 
@@ -124,7 +124,8 @@ export default {
       currentConversationId: '', // Added to track current conversation
       chatService: null,
       userService: null,
-      typingUsers: []
+      typingUsers: [],
+      resizeDebounceTimer: null
     }
   },
   created() {
@@ -162,7 +163,8 @@ export default {
 
     // Check if device is mobile
     this.checkIfMobile();
-    window.addEventListener('resize', this.checkIfMobile);
+    this.resizeDebounceTimer = null;
+    window.addEventListener('resize', this.handleResize);
 
     // Load saved sidebar widths from localStorage
     this.loadSavedSidebarWidths();
@@ -182,7 +184,7 @@ export default {
       this.callService.disconnect();
     }
 
-    window.removeEventListener('resize', this.checkIfMobile);
+    window.removeEventListener('resize', this.handleResize);
 
     // Remove global event listeners
     document.removeEventListener('mousemove', this.handleResize);
@@ -269,9 +271,11 @@ export default {
       this.sidebarOpen = !this.sidebarOpen;
     },
     checkIfMobile() {
+      const wasMobile = this.isMobile;
       this.isMobile = window.innerWidth < 768;
-      // Auto-close sidebar when switching to mobile
-      if (this.isMobile && this.sidebarOpen) {
+
+      // Only auto-close sidebar when switching from desktop to mobile
+      if (!wasMobile && this.isMobile && this.sidebarOpen) {
         this.sidebarOpen = false;
       }
     },
@@ -299,28 +303,16 @@ export default {
       event.preventDefault();
     },
 
-    handleResize(event) {
-      if (!this.resizing) return;
-
-      const windowWidth = window.innerWidth;
-
-      if (this.resizing === 'sidebar') {
-        // Calculate new width based on mouse position
-        let newWidth = event.clientX;
-
-        // Apply constraints
-        newWidth = Math.max(this.minSidebarWidth, Math.min(newWidth, this.maxSidebarWidth));
-        newWidth = Math.min(newWidth, windowWidth * 0.5); // Max 50% of window width
-
-        this.sidebarWidth = newWidth;
-
-        // Save to localStorage
-        try {
-          localStorage.setItem('sidebarWidth', newWidth.toString());
-        } catch (error) {
-          console.error('Error saving sidebar width:', error);
-        }
+    handleResize() {
+      // Clear previous timer
+      if (this.resizeDebounceTimer) {
+        clearTimeout(this.resizeDebounceTimer);
       }
+
+      // Set new timer
+      this.resizeDebounceTimer = setTimeout(() => {
+        this.checkIfMobile();
+      }, 250); // 250ms debounce
     },
 
     stopResizing() {
@@ -453,6 +445,20 @@ export default {
 
     logout() {
       // Implement logout functionality
+    },
+
+    // Updated method to handle sidebar resize
+    handleSidebarResize(newWidth) {
+      if (!this.isMobile && newWidth >= this.minSidebarWidth && newWidth <= this.maxSidebarWidth) {
+        this.sidebarWidth = newWidth;
+
+        // Save to localStorage for persistence
+        try {
+          localStorage.setItem('sidebarWidth', newWidth.toString());
+        } catch (error) {
+          console.error('Error saving sidebar width:', error);
+        }
+      }
     }
   },
   computed: {

@@ -1,10 +1,20 @@
 <template>
-  <div class="min-h-screen bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
+  <div class="min-h-screen bg-gray-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
+    <!-- Futuristic grid background -->
+    <div class="absolute inset-0 z-0 opacity-10">
+      <div class="grid-bg"></div>
+    </div>
+    <!-- Glowing orbs -->
+    <div class="absolute top-20 left-20 w-64 h-64 rounded-full bg-cyan-500 opacity-10 blur-[100px]"></div>
+    <div class="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-purple-500 opacity-10 blur-[100px]"></div>
+
+    <div class="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
       <!-- Logo -->
-      <div class="mx-auto h-16 w-16 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center shadow-lg overflow-hidden">
-        <!-- Replaced static logo with a fallback text -->
-        <div class="text-white font-bold text-xl">YA</div>
+      <div class="mx-auto h-16 w-16 rounded-full bg-gradient-to-r from-cyan-600 to-purple-600 flex items-center justify-center shadow-lg overflow-hidden relative group">
+        <!-- Glowing effect -->
+        <div class="absolute inset-0 bg-gradient-to-r from-cyan-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <!-- Logo content -->
+        <div class="text-white font-bold text-xl relative z-10">YA</div>
       </div>
 
       <h2 class="mt-6 text-center text-3xl font-extrabold text-white">
@@ -14,9 +24,11 @@
         {{ t('Welcome back! Please enter your details') }}
       </p>
     </div>
-    <p>https://984c-37-111-189-123.ngrok-free.app</p>
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-      <div class="bg-gray-800 py-8 px-4 shadow-xl sm:rounded-lg sm:px-10 border border-gray-700">
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+      <div class="bg-gray-900 py-8 px-4 shadow-xl sm:rounded-lg sm:px-10 border border-gray-800 backdrop-blur-sm relative group">
+        <!-- Glowing border on focus -->
+        <div class="absolute inset-0 rounded-lg bg-gradient-to-r from-cyan-500/30 to-purple-500/30 opacity-0 group-focus-within:opacity-100 blur-sm -z-10 transition-opacity duration-300"></div>
+
         <form class="space-y-6" @submit.prevent="onSubmit">
           <!-- Username Field -->
           <div>
@@ -34,7 +46,7 @@
                 required
                 :placeholder="t('Enter your username')"
                 :disabled="isLoading"
-                class="bg-gray-700 block w-full pl-10 pr-3 py-3 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 text-white"
+                class="bg-gray-800 block w-full pl-10 pr-3 py-3 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-cyan-500 focus:border-purple-500 text-white transition-colors duration-300"
               />
             </div>
           </div>
@@ -55,28 +67,8 @@
                 required
                 :placeholder="t('Enter your password')"
                 :disabled="isLoading"
-                class="bg-gray-700 block w-full pl-10 pr-3 py-3 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 text-white"
+                class="bg-gray-800 block w-full pl-10 pr-3 py-3 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-cyan-500 focus:border-purple-500 text-white transition-colors duration-300"
               />
-            </div>
-          </div>
-
-          <!-- Remember Me & Forgot Password -->
-          <div class="flex items-center justify-between">
-            <div class="flex items-center">
-              <input
-                id="remember-me"
-                type="checkbox"
-                class="h-4 w-4 text-green-500 focus:ring-green-500 border-gray-600 rounded bg-gray-700"
-              />
-              <label for="remember-me" class="ml-2 block text-sm text-gray-300">
-                {{ t('Remember me') }}
-              </label>
-            </div>
-
-            <div class="text-sm">
-              <a href="#" class="font-medium text-green-500 hover:text-green-400">
-                {{ t('Forgot your password?') }}
-              </a>
             </div>
           </div>
 
@@ -85,50 +77,34 @@
             <button
               type="submit"
               :disabled="isLoading"
-              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-800 transition-all duration-300 relative overflow-hidden"
+              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 focus:ring-offset-gray-900 transition-all duration-300 relative overflow-hidden group"
             >
-              <span v-if="isLoading" class="absolute inset-0 flex items-center justify-center">
+              <span class="absolute inset-0 bg-gradient-to-r from-cyan-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+              <span v-if="isLoading" class="absolute inset-0 flex items-center justify-center z-10">
                 <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               </span>
-              <span :class="{ 'opacity-0': isLoading }">{{ t('Sign In') }}</span>
+              <span :class="{ 'opacity-0': isLoading }" class="relative z-10">{{ t('Sign In') }}</span>
             </button>
           </div>
         </form>
 
         <!-- Divider -->
-        <div class="mt-6">
+        <div class="my-6">
           <div class="relative">
             <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-gray-600"></div>
-            </div>
-            <div class="relative flex justify-center text-sm">
-              <span class="px-2 bg-gray-800 text-gray-400">{{ t('Or continue with') }}</span>
-            </div>
-          </div>
-
-          <!-- Social Login Buttons -->
-          <div class="mt-6 grid grid-cols-2 gap-3">
-            <div>
-              <a href="#" class="w-full inline-flex justify-center py-2 px-4 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-sm font-medium text-gray-300 hover:bg-gray-600 transition-colors">
-                <i class="mdi mdi-google text-xl"></i>
-              </a>
-            </div>
-            <div>
-              <a href="#" class="w-full inline-flex justify-center py-2 px-4 border border-gray-600 rounded-md shadow-sm bg-gray-700 text-sm font-medium text-gray-300 hover:bg-gray-600 transition-colors">
-                <i class="mdi mdi-github text-xl"></i>
-              </a>
+              <div class="w-full border-t border-gray-700"></div>
             </div>
           </div>
         </div>
 
         <!-- Sign Up Link -->
-        <div class="mt-6 text-center">
-          <p class="text-sm text-gray-400">
+        <div class="mt-10 text-center">
+          <p class="text-sm text-gray-400 mt-4">
             {{ t('Don\'t have an account?') }}
-            <router-link to="/register" class="font-medium text-green-500 hover:text-green-400 transition-colors">
+            <router-link to="/register" class="font-medium text-cyan-500 hover:text-purple-400 transition-colors">
               {{ t('Sign up') }}
             </router-link>
           </p>
@@ -192,7 +168,7 @@ export default defineComponent({
 
         // Use more robust navigation with error handling
         try {
-          await router.push('/chat')
+          await this.$router.push('/chat')
           console.log('Navigation to /chat initiated')
         } catch (navError) {
           console.error('Navigation error:', navError)
@@ -213,4 +189,39 @@ export default defineComponent({
 </script>
 
 <style>
+/* Futuristic grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+  background-size: 30px 30px;
+  width: 100%;
+  height: 100%;
+}
+
+/* Pulse animation for elements */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(139, 92, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+  }
+}
+
+/* Floating animation for icons */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
 </style>

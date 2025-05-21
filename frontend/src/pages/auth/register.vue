@@ -1,10 +1,20 @@
 <template>
-  <div class="min-h-screen bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-xl">
+  <div class="min-h-screen bg-gray-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
+    <!-- Futuristic grid background -->
+    <div class="absolute inset-0 z-0 opacity-10">
+      <div class="grid-bg"></div>
+    </div>
+    <!-- Glowing orbs -->
+    <div class="absolute top-20 left-20 w-64 h-64 rounded-full bg-cyan-500 opacity-10 blur-[100px]"></div>
+    <div class="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-purple-500 opacity-10 blur-[100px]"></div>
+
+    <div class="sm:mx-auto sm:w-full sm:max-w-xl relative z-10">
       <!-- Logo -->
-      <div class="mx-auto h-16 w-16 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center shadow-lg overflow-hidden">
-        <!-- Logo fallback text -->
-        <div class="text-white font-bold text-xl">YA</div>
+      <div class="mx-auto h-16 w-16 rounded-full bg-gradient-to-r from-cyan-600 to-purple-600 flex items-center justify-center shadow-lg overflow-hidden relative group">
+        <!-- Glowing effect -->
+        <div class="absolute inset-0 bg-gradient-to-r from-cyan-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <!-- Logo content -->
+        <div class="text-white font-bold text-xl relative z-10">YA</div>
       </div>
 
       <h2 class="mt-6 text-center text-3xl font-extrabold text-white">
@@ -15,14 +25,17 @@
       </p>
     </div>
 
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
-      <div class="bg-gray-800 py-6 px-4 shadow-xl sm:rounded-lg sm:px-8 border border-gray-700">
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-xl relative z-10">
+      <div class="bg-gray-900 py-8 px-4 shadow-xl sm:rounded-lg sm:px-10 border border-gray-800 backdrop-blur-sm relative group">
+        <!-- Glowing border on focus -->
+        <div class="absolute inset-0 rounded-lg bg-gradient-to-r from-cyan-500/30 to-purple-500/30 opacity-0 group-focus-within:opacity-100 blur-sm -z-10 transition-opacity duration-300"></div>
+
         <!-- Error Message -->
         <div v-if="error" class="mb-6 p-3 bg-red-900/50 border border-red-800 rounded-md text-red-200 text-sm">
           {{ error }}
         </div>
 
-        <form @submit.prevent="handleRegister" class="space-y-4">
+        <form @submit.prevent="handleRegister" class="space-y-6">
           <!-- Name Fields Row -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- First Name Field -->
@@ -41,7 +54,7 @@
                   required
                   placeholder="First name"
                   :disabled="isLoading"
-                  class="bg-gray-700 block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 text-white text-sm"
+                  class="bg-gray-800 block w-full pl-10 pr-3 py-3 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-cyan-500 focus:border-purple-500 text-white transition-colors duration-300"
                 />
               </div>
             </div>
@@ -62,7 +75,7 @@
                   required
                   placeholder="Last name"
                   :disabled="isLoading"
-                  class="bg-gray-700 block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 text-white text-sm"
+                  class="bg-gray-800 block w-full pl-10 pr-3 py-3 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-cyan-500 focus:border-purple-500 text-white transition-colors duration-300"
                 />
               </div>
             </div>
@@ -84,7 +97,7 @@
                 required
                 placeholder="Choose a username"
                 :disabled="isLoading"
-                class="bg-gray-700 block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 text-white text-sm"
+                class="bg-gray-800 block w-full pl-10 pr-3 py-3 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-cyan-500 focus:border-purple-500 text-white transition-colors duration-300"
               />
             </div>
           </div>
@@ -105,7 +118,7 @@
                 required
                 placeholder="Enter your email address"
                 :disabled="isLoading"
-                class="bg-gray-700 block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 text-white text-sm"
+                class="bg-gray-800 block w-full pl-10 pr-3 py-3 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-cyan-500 focus:border-purple-500 text-white transition-colors duration-300"
               />
             </div>
           </div>
@@ -129,7 +142,7 @@
                   placeholder="Create a password"
                   minlength="8"
                   :disabled="isLoading"
-                  class="bg-gray-700 block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 text-white text-sm"
+                  class="bg-gray-800 block w-full pl-10 pr-3 py-3 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-cyan-500 focus:border-purple-500 text-white transition-colors duration-300"
                 />
               </div>
               <p class="mt-1 text-xs text-gray-400">Min 8 characters</p>
@@ -152,34 +165,44 @@
                   placeholder="Confirm password"
                   minlength="8"
                   :disabled="isLoading"
-                  class="bg-gray-700 block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 text-white text-sm"
+                  class="bg-gray-800 block w-full pl-10 pr-3 py-3 border border-gray-700 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-cyan-500 focus:border-purple-500 text-white transition-colors duration-300"
                 />
               </div>
             </div>
           </div>
 
           <!-- Submit Button -->
-          <div class="pt-2">
+          <div>
             <button
               type="submit"
               :disabled="isLoading || !isFormValid"
-              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-800 transition-all duration-300 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 focus:ring-offset-gray-900 transition-all duration-300 relative overflow-hidden group"
             >
-              <span v-if="isLoading" class="absolute inset-0 flex items-center justify-center">
+              <span class="absolute inset-0 bg-gradient-to-r from-cyan-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+              <span v-if="isLoading" class="absolute inset-0 flex items-center justify-center z-10">
                 <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               </span>
-              <span :class="{ 'opacity-0': isLoading }">Register</span>
+              <span :class="{ 'opacity-0': isLoading }" class="relative z-10">Register</span>
             </button>
           </div>
 
+          <!-- Divider -->
+          <div class="my-6">
+            <div class="relative">
+              <div class="absolute inset-0 flex items-center">
+                <div class="w-full border-t border-gray-700"></div>
+              </div>
+            </div>
+          </div>
+
           <!-- Login Link -->
-          <div class="text-center mt-6">
+          <div class="text-center">
             <p class="text-sm text-gray-400">
               Already have an account?
-              <router-link to="/login" class="font-medium text-green-500 hover:text-green-400 transition-colors">
+              <router-link to="/login" class="font-medium text-cyan-500 hover:text-purple-400 transition-colors">
                 Log in
               </router-link>
             </p>
@@ -289,3 +312,41 @@ export default {
   }
 }
 </script>
+
+<style>
+/* Futuristic grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+  background-size: 30px 30px;
+  width: 100%;
+  height: 100%;
+}
+
+/* Pulse animation for elements */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(139, 92, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+  }
+}
+
+/* Floating animation for icons */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+</style>

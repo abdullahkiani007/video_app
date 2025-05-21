@@ -1,75 +1,95 @@
 <template>
-  <div class="user-list-container p-4 rounded-lg shadow-md bg-white dark:bg-gray-800">
-    <div class="mb-6">
-      <h3 class="text-lg font-semibold mb-3 flex items-center text-gray-800 dark:text-gray-200">
-        <div class="mr-2 p-1 bg-green-100 dark:bg-green-900 rounded-md">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600 dark:text-green-400" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" />
-          </svg>
-        </div>
-        Online Users <span class="ml-2 px-2 py-1 text-sm bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full">{{ onlineCount }}</span>
-      </h3>
-      <ul v-if="onlineUsers.length" class="space-y-2">
-        <li v-for="user in onlineUsers" :key="user.id" class="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors duration-150">
-          <span class="w-3 h-3 bg-green-500 rounded-full mr-3 animate-pulse"></span>
-          <span class="text-gray-700 dark:text-gray-300 font-medium">{{ user.username }}</span>
-          <span v-if="isUserTyping(user.id)" class="ml-2 text-gray-500 text-xs italic">
-            typing<span class="typing-animation">...</span>
-          </span>
-        </li>
-      </ul>
-      <p v-else class="text-gray-500 dark:text-gray-400 italic text-sm">No users currently online</p>
+  <div class="flex flex-col h-full bg-gray-950 relative">
+    <!-- Futuristic grid background -->
+    <div class="absolute inset-0 z-0 opacity-5">
+      <div class="grid-bg"></div>
+    </div>
+    <!-- Subtle glowing orbs -->
+    <div class="absolute top-20 left-20 w-64 h-64 rounded-full bg-cyan-500 opacity-5 blur-[100px]"></div>
+    <div class="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-purple-500 opacity-5 blur-[100px]"></div>
+
+    <!-- Header -->
+    <div class="px-4 py-3 bg-gray-900/90 border-b border-gray-800 flex items-center shadow-sm backdrop-blur-sm relative z-10">
+      <h3 class="font-medium text-white">Participants</h3>
+      <div class="ml-auto text-xs text-gray-300 bg-gray-800/80 px-2 py-1 rounded-full">
+        {{ users.length }} online
+      </div>
     </div>
 
-    <div class="border-t dark:border-gray-700 pt-4">
-      <h3 class="text-lg font-semibold mb-3 flex items-center text-gray-800 dark:text-gray-200">
-        <div class="mr-2 p-1 bg-blue-100 dark:bg-blue-900 rounded-md">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600 dark:text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
-          </svg>
+    <!-- User list -->
+    <div class="flex-1 overflow-y-auto p-2 bg-gray-900/50 backdrop-blur-sm relative z-10">
+      <div v-if="!users || users.length === 0" class="flex items-center justify-center h-full">
+        <div class="text-gray-400 italic text-center p-4 bg-gray-800/80 rounded-lg shadow-sm border border-gray-700">
+          No users online
         </div>
-        All Users <span class="ml-2 px-2 py-1 text-sm bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full">{{ users.length }}</span>
-      </h3>
-      <div v-if="!users || users.length === 0" class="text-gray-500 italic text-center mt-4">
-        No users available
       </div>
 
       <div v-else>
-        <div
-          v-for="user in sortedUsers"
-          :key="user.id"
-          class="flex items-center p-2 hover:bg-gray-100 rounded-lg mb-1"
-        >
-          <div class="relative">
-            <!-- User avatar or placeholder -->
-            <div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-semibold">
-              {{ getUserInitials(user.username) }}
+        <!-- Current user (you) -->
+        <div v-if="currentUser" class="mb-4 p-2">
+          <div class="text-xs uppercase text-gray-400 font-semibold mb-2 px-2">You</div>
+          <div class="flex items-center p-2 rounded-lg bg-gradient-to-r from-cyan-900/30 to-purple-900/30 border border-gray-800 backdrop-blur-sm group hover:border-gray-700 transition-all duration-300">
+            <!-- User avatar -->
+            <div class="relative">
+              <div class="h-10 w-10 rounded-full bg-gradient-to-r from-cyan-600 to-purple-600 flex items-center justify-center text-white font-medium overflow-hidden">
+                {{ getInitials(currentUser) }}
+              </div>
+              <div class="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-gray-900"></div>
             </div>
 
-            <!-- Online status indicator -->
-            <div
-              class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white"
-              :class="user.isOnline ? 'bg-green-500' : 'bg-gray-400'"
-            ></div>
+            <!-- User info -->
+            <div class="ml-3 flex-1 min-w-0">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-white truncate group-hover:text-cyan-400 transition-colors">
+                  {{ currentUser }}
+                </p>
+                <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300">
+                  You
+                </span>
+              </div>
+              <p class="text-xs text-gray-400 truncate">Online</p>
+            </div>
           </div>
+        </div>
 
-          <div class="ml-3 flex-1 min-w-0">
-            <div class="flex items-center justify-between">
-              <p class="text-sm font-medium text-gray-900 truncate">
-                {{ user.username }}
-              </p>
-              <span
-                class="text-xs px-2 py-1 rounded-full"
-                :class="user.isOnline ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
-              >
-                {{ user.isOnline ? 'Online' : 'Offline' }}
-              </span>
+        <!-- Other users -->
+        <div v-if="otherUsers.length > 0" class="p-2">
+          <div class="text-xs uppercase text-gray-400 font-semibold mb-2 px-2">Other Users</div>
+          <div
+            v-for="(user, index) in otherUsers"
+            :key="index"
+            class="flex items-center p-2 rounded-lg mb-2 bg-gray-800/60 border border-gray-800 hover:border-gray-700 group transition-all duration-300"
+          >
+            <!-- User avatar -->
+            <div class="relative">
+              <div class="h-10 w-10 rounded-full bg-gray-700 flex items-center justify-center text-white font-medium overflow-hidden">
+                {{ getInitials(user.username || user.name || 'User') }}
+              </div>
+              <div
+                class="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-gray-900"
+                :class="user.isOnline ? 'bg-green-500' : 'bg-gray-500'"
+              ></div>
             </div>
 
-            <!-- Typing indicator -->
-            <p v-if="user.is_typing" class="text-xs text-gray-500 italic">
-              typing...
-            </p>
+            <!-- User info -->
+            <div class="ml-3 flex-1 min-w-0">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-white truncate group-hover:text-cyan-400 transition-colors">
+                  {{ user.username || user.name || 'User' }}
+                </p>
+                <span v-if="user.is_typing" class="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 flex items-center">
+                  <span class="typing-dots mr-1">
+                    <span class="bg-cyan-400"></span>
+                    <span class="bg-purple-400"></span>
+                    <span class="bg-cyan-400"></span>
+                  </span>
+                  typing
+                </span>
+              </div>
+              <p class="text-xs text-gray-400 truncate">
+                {{ user.isOnline ? 'Online' : 'Offline' }}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -86,163 +106,140 @@ export default {
       required: true,
       default: () => []
     },
-    initialWidth: {
-      type: Number,
-      default: 288
+    currentUserId: {
+      type: String,
+      default: ''
     }
   },
-  data() {
-    return {
-      typingUsers: {},
-      typingTimeouts: {}
-    };
-  },
   computed: {
-    onlineUsers() {
-      return this.users.filter(user => user.isOnline || false);
-    },
-    onlineCount() {
-      return this.onlineUsers.length || 0;
-    },
-    sortedUsers() {
-      // Sort users: online users first, then alphabetically by username
-      return [...this.users].sort((a, b) => {
-        // First sort by online status
-        if (a.isOnline && !b.isOnline) return -1;
-        if (!a.isOnline && b.isOnline) return 1;
+    // Find current user from the users array
+    currentUser() {
+      if (!this.users || !this.currentUserId) return null;
 
-        // Then sort alphabetically by username
-        return a.username.localeCompare(b.username);
-      });
+      const currentUserObj = this.users.find(user =>
+        user.id === this.currentUserId ||
+        user.userId === this.currentUserId
+      );
+
+      return currentUserObj ? (currentUserObj.username || currentUserObj.name) : null;
+    },
+
+    // Filter out current user from the users array
+    otherUsers() {
+      if (!this.users) return [];
+
+      return this.users.filter(user =>
+        user.id !== this.currentUserId &&
+        user.userId !== this.currentUserId
+      );
     }
   },
   methods: {
-    isUserTyping(userId) {
-      // Safely check if user is typing
-      return userId && this.typingUsers[userId] === true;
-    },
-    userStartedTyping(userId) {
-      if (!userId) return;
-
-      // Clear any existing timeout for this user
-      if (this.typingTimeouts[userId]) {
-        clearTimeout(this.typingTimeouts[userId]);
-      }
-
-      // Set typing status
-      this.$set(this.typingUsers, userId, true);
-
-      // Set timeout to clear typing status after 3 seconds
-      this.typingTimeouts[userId] = setTimeout(() => {
-        this.$set(this.typingUsers, userId, false);
-      }, 3000);
-    },
-    userStoppedTyping(userId) {
-      if (!userId) return;
-
-      // Clear any existing timeout
-      if (this.typingTimeouts[userId]) {
-        clearTimeout(this.typingTimeouts[userId]);
-      }
-
-      // Clear typing status
-      this.$set(this.typingUsers, userId, false);
-    },
-    getUserInitials(username) {
-      if (!username) return '?';
-
-      // Safely get initials from username
+    // Get initials from name
+    getInitials(name) {
       try {
-        return username
-          .split(' ')
-          .map(name => name.charAt(0))
-          .join('')
-          .toUpperCase()
-          .substring(0, 2);
+        if (!name) return '?';
+
+        // Handle single word names
+        if (!name.includes(' ')) {
+          return name.charAt(0).toUpperCase();
+        }
+
+        // Get first letter of first and last name
+        const parts = name.split(' ');
+        return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
       } catch (error) {
-        console.error('Error getting user initials:', error);
+        console.error('Error getting initials:', error);
         return '?';
       }
     }
-  },
-  beforeDestroy() {
-    // Clean up all timeouts when component is destroyed
-    Object.values(this.typingTimeouts).forEach(timeout => {
-      if (timeout) clearTimeout(timeout);
-    });
   }
 }
 </script>
 
 <style scoped>
-.user-list-container {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.user-list-container:hover {
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
-}
-
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5);
-  border-radius: 20px;
-}
-
-@media (prefers-color-scheme: dark) {
-  .custom-scrollbar {
-    scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(75, 85, 99, 0.5);
-  }
-}
-
-.typing-animation {
-  display: inline-block;
-  animation: typingDots 1.4s infinite;
-}
-
-@keyframes typingDots {
-  0%, 20% { opacity: 0; }
-  40% { opacity: 1; }
-  60% { opacity: 1; }
-  80%, 100% { opacity: 0; }
-}
-
+/* Ensure scrolling works properly */
 .overflow-y-auto {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
 
+/* Custom scrollbar styling */
 .overflow-y-auto::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #1f2937; /* dark gray to match theme */
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: #ddd;
-  border-radius: 2px;
+  background: #4b5563; /* medium gray */
+  border-radius: 3px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: #bbb;
+  background: #6b7280; /* lighter gray on hover */
+}
+
+/* Typing indicator animation */
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+}
+
+.typing-dots span {
+  height: 4px;
+  width: 4px;
+  margin: 0 1px;
+  border-radius: 50%;
+  display: inline-block;
+  opacity: 0.7;
+}
+
+.typing-dots span:nth-child(1) {
+  animation: pulse 1s infinite 0.1s;
+}
+
+.typing-dots span:nth-child(2) {
+  animation: pulse 1s infinite 0.3s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation: pulse 1s infinite 0.5s;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Futuristic grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(59, 130, 246, 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.1) 1px, transparent 1px);
+  background-size: 30px 30px;
+  width: 100%;
+  height: 100%;
+}
+
+/* Floating animation for elements */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
 }
 </style>
