@@ -4,6 +4,7 @@
     <div class="absolute inset-0 z-0 opacity-5">
       <div class="grid-bg"></div>
     </div>
+
     <!-- Subtle glowing orbs -->
     <div class="absolute top-20 left-20 w-64 h-64 rounded-full bg-cyan-500 opacity-5 blur-[100px]"></div>
     <div class="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-purple-500 opacity-5 blur-[100px]"></div>
@@ -54,7 +55,7 @@
 
     <!-- Empty state - no participants -->
     <div v-if="totalParticipants === 0" class="flex justify-center items-center h-full text-gray-400 text-lg relative z-10">
-      <div class="text-center p-8 bg-gray-800/30 backdrop-blur-sm rounded-xl max-w-md border border-gray-700/50">
+      <div class="text-center p-8 bg-gray-950/30 backdrop-blur-sm rounded-xl max-w-md border border-gray-700/50">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>

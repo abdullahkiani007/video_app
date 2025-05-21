@@ -71,8 +71,12 @@
     <div class="flex-1 overflow-hidden relative">
       <!-- Users tab -->
       <div v-if="activeTab === 'users'" class="h-full overflow-y-auto p-4 relative z-10">
-        <h2 class="text-xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">Online Users</h2>
-        <UserList :users="users" :initial-width="width - 32" />
+        <UserList
+          :users="users"
+          :onlineUsers="onlineUsers"
+          :currentUserId="username"
+          :initial-width="width - 32"
+        />
       </div>
 
       <!-- Chat tab -->
@@ -132,6 +136,10 @@ export default {
       default: () => []
     },
     typingUsers: {
+      type: Array,
+      default: () => []
+    },
+    onlineUsers: {
       type: Array,
       default: () => []
     }

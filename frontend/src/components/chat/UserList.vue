@@ -12,7 +12,7 @@
     <div class="px-4 py-3 bg-gray-900/90 border-b border-gray-800 flex items-center shadow-sm backdrop-blur-sm relative z-10">
       <h3 class="font-medium text-white">Participants</h3>
       <div class="ml-auto text-xs text-gray-300 bg-gray-800/80 px-2 py-1 rounded-full">
-        {{ users.length }} online
+        {{ onlineCount }} online
       </div>
     </div>
 
@@ -67,7 +67,7 @@
               </div>
               <div
                 class="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-gray-900"
-                :class="user.isOnline ? 'bg-green-500' : 'bg-gray-500'"
+                :class="user.is_online ? 'bg-green-500' : 'bg-gray-500'"
               ></div>
             </div>
 
@@ -87,7 +87,7 @@
                 </span>
               </div>
               <p class="text-xs text-gray-400 truncate">
-                {{ user.isOnline ? 'Online' : 'Offline' }}
+                {{ user.is_online ? 'Online' : 'Offline' }}
               </p>
             </div>
           </div>
@@ -109,9 +109,31 @@ export default {
     currentUserId: {
       type: String,
       default: ''
+    },
+    onlineUsers: {
+      type: Array,
+      required: true,
+      default: () => []
     }
   },
   computed: {
+    // Calculate the actual number of online users
+    onlineCount() {
+      // Safely handle edge cases
+      if (!this.onlineUsers || !Array.isArray(this.onlineUsers) || !this.users) {
+        return 0;
+      }
+
+      // Count only users that exist in both the users array and onlineUsers array
+      const onlineUserIds = this.onlineUsers.map(id => String(id));
+      const validOnlineUsers = this.users.filter(user =>
+        onlineUserIds.includes(String(user.id)) ||
+        onlineUserIds.includes(String(user.userId))
+      );
+
+      return validOnlineUsers.length;
+    },
+
     // Find current user from the users array
     currentUser() {
       if (!this.users || !this.currentUserId) return null;
@@ -124,14 +146,32 @@ export default {
       return currentUserObj ? (currentUserObj.username || currentUserObj.name) : null;
     },
 
-    // Filter out current user from the users array
+    // Filter out current user from the users array and sort by online status
     otherUsers() {
       if (!this.users) return [];
 
       return this.users.filter(user =>
         user.id !== this.currentUserId &&
         user.userId !== this.currentUserId
-      );
+      ).map(user => {
+        // Check if user is online by comparing their string ID with onlineUsers array
+        // Convert user.id and user.userId to strings before comparison
+        const isOnline = this.onlineUsers.includes(String(user.id)) || this.onlineUsers.includes(String(user.userId));
+
+        return {
+          ...user,
+          is_online: isOnline
+        };
+      }).sort((a, b) => {
+        // Sort by online status (online users first)
+        if (a.is_online && !b.is_online) return -1;
+        if (!a.is_online && b.is_online) return 1;
+
+        // If both have the same online status, sort alphabetically by username/name
+        const nameA = (a.username || a.name || '').toLowerCase();
+        const nameB = (b.username || b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
     }
   },
   methods: {

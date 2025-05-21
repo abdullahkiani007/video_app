@@ -60,6 +60,7 @@
       :width="sidebarWidth"
       :username="username"
       :users="users"
+      :onlineUsers="onlineUsers"
       :messages="messages"
       :typingUsers="typingUsers"
       @close="toggleSidebar"
@@ -125,13 +126,17 @@ export default {
       chatService: null,
       userService: null,
       typingUsers: [],
-      resizeDebounceTimer: null
+      resizeDebounceTimer: null,
+      // New properties for tracking online users
+      onlineUserActivityMap: {},
+      onlineUserRefreshInterval: null,
+      onlineUserTimeoutMs: 60000, // 1 minute timeout for inactivity
+      onlineUserRefreshMs: 30000, // Refresh online users every 30 seconds
     }
   },
   created() {
     // Get user info from Pinia store
     const authStore = useAuthStore();
-    console.log("authStore " , authStore.user)
     this.userId = authStore.user?.id || '';
     this.username = authStore.user?.username || '';
 
@@ -140,6 +145,10 @@ export default {
       this.$router.push('/login');
       return;
     }
+
+    // Initialize services
+    this.chatService = chatService;
+    this.userService = userService;
 
     // Initialize CallService
     this.callService = new CallService({
@@ -168,6 +177,9 @@ export default {
 
     // Load saved sidebar widths from localStorage
     this.loadSavedSidebarWidths();
+
+    // Initialize online user refresh interval
+    this.startOnlineUserRefresh();
   },
   mounted() {
     // Add global event listeners for resizing
@@ -189,6 +201,9 @@ export default {
     // Remove global event listeners
     document.removeEventListener('mousemove', this.handleResize);
     document.removeEventListener('mouseup', this.stopResizing);
+
+    // Clear online user refresh interval
+    this.stopOnlineUserRefresh();
   },
   methods: {
     // New methods for CallService integration
@@ -219,11 +234,17 @@ export default {
 
     handleMessageReceived(message) {
       this.messages.push(message);
+
+      // Update sender's activity status
+      if (message.userId && message.userId !== this.userId) {
+        this.updateUserActivity(message.userId);
+      }
     },
 
     handleUserJoined(userId) {
       console.log(`User ${userId} joined the call`);
-      // Update user status in the UI if needed
+      // Update user's activity status
+      this.updateUserActivity(userId);
     },
 
     handleUserLeft(userId) {
@@ -233,13 +254,27 @@ export default {
 
     handleUsersUpdated(users) {
       // Update online users from WebSocket
-      this.onlineUsers = users || [];
-      // Mark online status in allUsers
-      this.updateUserStatus();
+      if (Array.isArray(users)) {
+        users.forEach(user => {
+          // Update activity for each user from the WebSocket
+          const userId = typeof user === 'object' ? user.id : user;
+          if (userId && userId !== this.userId) {
+            this.updateUserActivity(userId);
+          }
+        });
+      }
+
+      console.log('Online users updated from WebSocket');
+      // Refresh online users list
+      this.refreshOnlineUsers();
     },
 
     handleTypingStatusChanged(userId, isTyping, conversationId) {
-      console.log(`User ${userId} is ${isTyping ? 'typing' : 'not typing'} in conversation ${conversationId}`);
+
+      // Update user's activity status
+      if (userId && userId !== this.userId) {
+        this.updateUserActivity(userId);
+      }
 
       // Find the username for this user ID
       const user = this.users.find(user => user.id === userId);
@@ -322,13 +357,10 @@ export default {
     async fetchUsers() {
       try {
         const response = await userService.getUsers();
-        console.log("response " , response)
 
         if (response.status !== 200) {
           throw new Error(`Failed to fetch users: ${response.status}`);
         }
-
-        console.log("response.data " , response.data)
         this.allUsers = response.data || [];
         // Initialize online users as empty until WebSocket updates
         this.onlineUsers = [];
@@ -360,17 +392,29 @@ export default {
     },
 
     updateUserStatus() {
+      if (!Array.isArray(this.allUsers) || !Array.isArray(this.onlineUsers)) {
+        console.warn('Invalid users arrays:', { allUsers: this.allUsers, onlineUsers: this.onlineUsers });
+        return;
+      }
+
       // Create a map of online user IDs for quick lookup
-      const onlineUserIds = new Set(this.onlineUsers.map(user => user.id));
+      const onlineUserIds = new Set();
+      this.onlineUsers.forEach(userId => {
+        // Handle both object format and primitive format
+        const id = typeof userId === 'object' ? userId.id : userId;
+        if (id) onlineUserIds.add(id);
+      });
+
+      // Add current user to online users
+      onlineUserIds.add(this.userId);
+
 
       // Update all users with online status
-      this.allUsers = this.allUsers.map(user => ({
+      this.users = this.allUsers.map(user => ({
         ...user,
         isOnline: onlineUserIds.has(user.id)
       }));
 
-      // Update the users array that's passed to the UserList component
-      this.users = this.allUsers;
     },
 
     sendMessage(text) {
@@ -459,7 +503,73 @@ export default {
           console.error('Error saving sidebar width:', error);
         }
       }
-    }
+    },
+
+    // New methods for online user tracking
+    startOnlineUserRefresh() {
+      // Clear any existing interval
+      this.stopOnlineUserRefresh();
+
+      // Start a new interval
+      this.onlineUserRefreshInterval = setInterval(() => {
+        this.refreshOnlineUsers();
+      }, this.onlineUserRefreshMs);
+
+      // Initial refresh
+      this.refreshOnlineUsers();
+    },
+
+    stopOnlineUserRefresh() {
+      if (this.onlineUserRefreshInterval) {
+        clearInterval(this.onlineUserRefreshInterval);
+        this.onlineUserRefreshInterval = null;
+      }
+    },
+
+    refreshOnlineUsers() {
+      const now = Date.now();
+      const activeUserIds = [];
+
+      // Check which users are still active within the timeout period
+      for (const [userId, lastActivity] of Object.entries(this.onlineUserActivityMap)) {
+        if (now - lastActivity <= this.onlineUserTimeoutMs) {
+          activeUserIds.push(userId);
+        }
+      }
+
+      // Always include current user
+      if (!activeUserIds.includes(this.userId)) {
+        activeUserIds.push(this.userId);
+        this.updateUserActivity(this.userId);
+      }
+
+      // Update online users list
+      this.onlineUsers = activeUserIds;
+
+      // Update user status in UI
+      this.updateUserStatus();
+
+      console.log('Refreshed online users:', activeUserIds);
+    },
+
+    updateUserActivity(userId) {
+      // Safely handle both string and object user IDs
+      const id = typeof userId === 'object' ? userId.id : userId;
+
+      if (!id) {
+        console.warn('Invalid user ID for activity update:', userId);
+        return;
+      }
+
+      // Update last activity timestamp
+      this.onlineUserActivityMap[id] = Date.now();
+
+      // Add to online users if not already there
+      if (!this.onlineUsers.includes(id)) {
+        this.onlineUsers = [...this.onlineUsers, id];
+        this.updateUserStatus();
+      }
+    },
   },
   computed: {
     totalParticipants() {

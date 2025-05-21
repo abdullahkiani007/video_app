@@ -46,7 +46,7 @@
             class="p-3 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md"
             :class="[
               message.sender_username === currentUser ?
-              'bg-gradient-to-r from-cyan-600 to-purple-600 text-white rounded-tr-none' :
+              ' bg-purple-800 text-white rounded-tr-none' :
               'bg-gray-800/90 text-gray-300 rounded-tl-none border border-gray-700'
             ]"
           >
