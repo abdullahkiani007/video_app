@@ -14,6 +14,7 @@ const router = createRouter({
         title: 'Home'
       }
     },
+
     {
       path: '/chat',
       name: 'ChatRoom',
@@ -21,6 +22,26 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         title: 'Chat Room'
+      }
+    },
+
+    // auth routes
+    {
+      path:'/login',
+      name: "Login",
+      component: () => import('@/pages/auth/login.vue'),
+      meta:{
+        requireAuth:false,
+        title:"Login"
+      }
+    },
+    {
+      path:'/register',
+      name: "Register",
+      component: () => import('@/pages/auth/register.vue'),
+      meta:{
+        requireAuth:false,
+        title:"Register"
       }
     }
 

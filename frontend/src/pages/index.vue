@@ -7,6 +7,17 @@ export default defineComponent({
   data() {
     return {
       isMenuOpen: false,
+      logoUrl: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vuejs/vuejs-original.svg',
+      logoAlt: 'YourApp Logo',
+      heroImageUrl: 'https://images.unsplash.com/photo-1551434678-e076c223a692?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
+      heroImageAlt: 'Team collaborating on a project',
+      testimonialImageUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
+      testimonialImageAlt: 'Jane Doe',
+      logoFallbackText: 'YourApp',
+      heroFallbackText: 'Platform Visualization',
+      logoLoaded: true,
+      heroLoaded: true,
+      testimonialImageLoaded: true,
       features: [
         {
           id: 1,
@@ -25,8 +36,50 @@ export default defineComponent({
           title: 'Fast & Reliable',
           description: 'Experience lightning-fast performance with 99.9% uptime.',
           icon: 'mdi-rocket-launch-outline'
+        },
+        {
+          id: 4,
+          title: 'Smart Analytics',
+          description: 'Gain valuable insights with our powerful analytics tools.',
+          icon: 'mdi-chart-line'
+        },
+        {
+          id: 5,
+          title: 'Team Collaboration',
+          description: 'Work together seamlessly with real-time collaboration features.',
+          icon: 'mdi-account-group-outline'
+        },
+        {
+          id: 6,
+          title: 'Mobile Friendly',
+          description: 'Access your work from anywhere on any device.',
+          icon: 'mdi-cellphone-link'
         }
-      ]
+      ],
+      testimonials: [
+        {
+          id: 1,
+          text: "This platform has completely transformed how our team works. We've increased productivity by 35% since implementing it.",
+          name: "Jane Doe",
+          position: "Product Manager, Acme Inc.",
+          avatar: "https://randomuser.me/api/portraits/women/44.jpg"
+        },
+        {
+          id: 2,
+          text: "The collaboration features are outstanding. We've cut our meeting time in half and improved our project delivery.",
+          name: "John Smith",
+          position: "CTO, TechStart",
+          avatar: "https://randomuser.me/api/portraits/men/32.jpg"
+        },
+        {
+          id: 3,
+          text: "Customer support is exceptional. Any time we've had questions, the team has been responsive and helpful.",
+          name: "Emily Chen",
+          position: "Operations Director, Global Solutions",
+          avatar: "https://randomuser.me/api/portraits/women/68.jpg"
+        }
+      ],
+      currentTestimonialIndex: 0
     }
   },
 
@@ -47,6 +100,55 @@ export default defineComponent({
       } catch (error) {
         console.error('Navigation error:', error)
       }
+    },
+
+    handleImageError(event, type) {
+      // More robust image error handling with type parameter
+      if (!event || !event.target) {
+        console.error('Invalid event in handleImageError')
+        return
+      }
+
+      console.warn(`Image failed to load: ${type}`)
+
+      // Update loading state based on image type
+      if (type === 'logo') {
+        this.logoLoaded = false
+        // Apply fallback styling to container
+        const container = event.target.closest('.navbar-brand, .footer-brand')
+        if (container) {
+          container.classList.add('text-fallback')
+        }
+      } else if (type === 'hero') {
+        this.heroLoaded = false
+      } else if (type === 'testimonial') {
+        this.testimonialImageLoaded = false
+      }
+
+      // Hide the broken image
+      event.target.style.display = 'none'
+    },
+
+    changeTestimonial(direction) {
+      // Defensive check for valid direction
+      if (typeof direction !== 'string' || (direction !== 'next' && direction !== 'prev')) {
+        console.error('Invalid direction for testimonial change');
+        return;
+      }
+
+      const totalTestimonials = this.testimonials.length;
+
+      // Defensive check for empty testimonials array
+      if (!totalTestimonials) {
+        console.warn('No testimonials available');
+        return;
+      }
+
+      if (direction === 'next') {
+        this.currentTestimonialIndex = (this.currentTestimonialIndex + 1) % totalTestimonials;
+      } else {
+        this.currentTestimonialIndex = (this.currentTestimonialIndex - 1 + totalTestimonials) % totalTestimonials;
+      }
     }
   },
 
@@ -58,131 +160,170 @@ export default defineComponent({
 </script>
 
 <template>
-  <div class="landing-page">
-    <!-- Navigation Bar -->
-    <nav class="navbar">
-      <div class="container">
-        <div class="navbar-brand">
-          <img src="/logo.svg" alt="Logo" class="logo" />
-          <h1 class="company-name">YourApp</h1>
-
-          <!-- Mobile menu button -->
-          <button
-            class="menu-toggle"
-            @click="toggleMenu"
-            aria-label="Toggle navigation menu"
-          >
-            <span class="icon" :class="{ 'open': isMenuOpen }">
-              <span></span>
-              <span></span>
-              <span></span>
-            </span>
-          </button>
-        </div>
-
-        <div class="navbar-menu" :class="{ 'is-active': isMenuOpen }">
-          <div class="navbar-end">
-            <a href="#features" class="navbar-item">Features</a>
-            <a href="#about" class="navbar-item">About</a>
-            <a href="#contact" class="navbar-item">Contact</a>
-            <div class="navbar-buttons">
+  <div class="landing-page bg-gray-900 text-white">
+    <!-- Hero Section -->
+    <section class="relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-b from-gray-900 to-gray-800 z-0"></div>
+      <div class="container mx-auto px-4 relative z-10">
+        <div class="flex flex-col md:flex-row items-center gap-12">
+          <div class="w-full md:w-1/2 text-center md:text-left">
+            <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-green-400 to-green-500 bg-clip-text text-transparent">
+              Welcome to a Better Way to Work
+            </h1>
+            <p class="text-lg md:text-xl text-gray-300 mb-8">
+              Streamline your workflow, collaborate seamlessly, and achieve more with our powerful platform.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <button
-                class="btn btn-outline"
-                @click="navigateTo('/login')"
-                aria-label="Log in to your account"
+                class="px-6 py-3 rounded-full bg-gradient-to-r from-green-600 to-green-500 text-white font-medium hover:shadow-lg transition-all duration-300"
+                @click="navigateTo('/register')"
+                aria-label="Get started with a free account"
               >
-                Log In
+                Get Started — It's Free
               </button>
               <button
-                class="btn btn-primary"
-                @click="navigateTo('/register')"
-                aria-label="Create a new account"
+                class="px-6 py-3 rounded-full bg-gray-800 border border-gray-700 text-green-400 font-medium hover:bg-gray-700 transition-all duration-300"
+                @click="navigateTo('/demo')"
+                aria-label="Watch a product demonstration"
               >
-                Sign Up
+                Watch Demo
               </button>
             </div>
           </div>
-        </div>
-      </div>
-    </nav>
-
-    <!-- Hero Section -->
-    <section class="hero">
-      <div class="container">
-        <div class="hero-content">
-          <h1 class="hero-title">Welcome to a Better Way to Work</h1>
-          <p class="hero-subtitle">
-            Streamline your workflow, collaborate seamlessly, and achieve more with our powerful platform.
-          </p>
-          <div class="hero-buttons">
-            <button
-              class="btn btn-primary btn-lg"
-              @click="navigateTo('/register')"
-              aria-label="Get started with a free account"
-            >
-              Get Started — It's Free
-            </button>
-            <button
-              class="btn btn-outline btn-lg"
-              @click="navigateTo('/demo')"
-              aria-label="Watch a product demonstration"
-            >
-              Watch Demo
-            </button>
+          <div class="w-full md:w-1/2">
+            <div class="relative rounded-xl overflow-hidden shadow-2xl shadow-green-900/20">
+              <img
+                v-if="heroLoaded"
+                :src="heroImageUrl"
+                :alt="heroImageAlt"
+                class="w-full h-auto transform hover:scale-105 transition-transform duration-700"
+                @error="(e) => handleImageError(e, 'hero')"
+              />
+              <div v-else class="bg-gray-800 w-full h-64 flex flex-col items-center justify-center">
+                <div class="text-4xl text-gray-600 mb-2">
+                  <i class="mdi mdi-image-outline"></i>
+                </div>
+                <p class="text-gray-500">{{ heroFallbackText }}</p>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="hero-image">
-          <img src="/hero-image.svg" alt="Platform demonstration" />
         </div>
       </div>
     </section>
 
     <!-- Features Section -->
-    <section id="features" class="features">
-      <div class="container">
-        <h2 class="section-title">Why Choose Us</h2>
-        <div class="features-grid">
+    <section id="features" class="py-16 md:py-24 bg-gray-800">
+      <div class="container mx-auto px-4">
+        <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-white">Why Choose Us</h2>
+        <p class="text-xl text-gray-400 text-center max-w-3xl mx-auto mb-16">
+          Powerful features designed to boost your productivity
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <div
             v-for="feature in features"
             :key="feature.id"
-            class="feature-card"
+            class="bg-gray-900 rounded-xl p-8 border border-gray-700 hover:border-green-500 transition-all duration-300 hover:shadow-lg hover:shadow-green-900/10 hover:-translate-y-1"
           >
-            <div class="feature-icon">
+            <div class="text-green-500 text-4xl mb-6">
               <i :class="feature.icon"></i>
             </div>
-            <h3 class="feature-title">{{ feature.title }}</h3>
-            <p class="feature-description">{{ feature.description }}</p>
+            <h3 class="text-xl font-bold mb-4 text-white">{{ feature.title }}</h3>
+            <p class="text-gray-400">{{ feature.description }}</p>
           </div>
         </div>
       </div>
     </section>
 
     <!-- Testimonials Section -->
-    <section class="testimonials">
-      <div class="container">
-        <h2 class="section-title">What Our Users Say</h2>
-        <div class="testimonial-card">
-          <p class="testimonial-text">
-            "This platform has completely transformed how our team works. We've increased productivity by 35% since implementing it."
-          </p>
-          <div class="testimonial-author">
-            <img src="/testimonial-1.jpg" alt="Jane Doe" class="testimonial-avatar" />
-            <div class="testimonial-info">
-              <h4 class="testimonial-name">Jane Doe</h4>
-              <p class="testimonial-position">Product Manager, Acme Inc.</p>
+    <section id="testimonials" class="py-16 md:py-24 bg-gray-900">
+      <div class="container mx-auto px-4">
+        <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 text-white">What Our Users Say</h2>
+        <p class="text-xl text-gray-400 text-center max-w-3xl mx-auto mb-16">
+          Join thousands of satisfied customers worldwide
+        </p>
+
+        <div class="relative max-w-4xl mx-auto">
+          <button
+            class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 md:-translate-x-12 w-10 h-10 rounded-full bg-gray-800 border border-gray-700 text-green-500 flex items-center justify-center hover:bg-gray-700 transition-colors z-10"
+            @click="changeTestimonial('prev')"
+            aria-label="Previous testimonial"
+          >
+            <i class="mdi mdi-chevron-left text-2xl"></i>
+          </button>
+
+          <div class="bg-gray-800 rounded-2xl p-8 md:p-10 border border-gray-700 shadow-xl">
+            <p class="text-xl md:text-2xl text-gray-300 italic mb-8 relative">
+              <span class="absolute -top-6 -left-2 text-6xl text-green-500/20">"</span>
+              {{ testimonials[currentTestimonialIndex].text }}
+              <span class="absolute -bottom-10 -right-2 text-6xl text-green-500/20">"</span>
+            </p>
+            <div class="flex items-center">
+              <img
+                :src="testimonials[currentTestimonialIndex].avatar"
+                :alt="testimonials[currentTestimonialIndex].name"
+                class="w-14 h-14 rounded-full border-2 border-green-500 object-cover mr-4"
+                @error="(e) => handleImageError(e, 'testimonial')"
+              />
+              <div>
+                <h4 class="font-bold text-white">{{ testimonials[currentTestimonialIndex].name }}</h4>
+                <p class="text-gray-400">{{ testimonials[currentTestimonialIndex].position }}</p>
+              </div>
             </div>
+          </div>
+
+          <button
+            class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 md:translate-x-12 w-10 h-10 rounded-full bg-gray-800 border border-gray-700 text-green-500 flex items-center justify-center hover:bg-gray-700 transition-colors z-10"
+            @click="changeTestimonial('next')"
+            aria-label="Next testimonial"
+          >
+            <i class="mdi mdi-chevron-right text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="flex justify-center mt-8 space-x-2">
+          <button
+            v-for="(testimonial, index) in testimonials"
+            :key="testimonial.id"
+            class="w-3 h-3 rounded-full transition-all duration-300"
+            :class="index === currentTestimonialIndex ? 'bg-green-500 scale-125' : 'bg-gray-700 hover:bg-gray-600'"
+            @click="currentTestimonialIndex = index"
+            :aria-label="`Go to testimonial ${index + 1}`"
+          ></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="py-16 md:py-24 bg-gray-800">
+      <div class="container mx-auto px-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <div class="p-6 rounded-xl bg-gray-900 border border-gray-700 hover:border-green-500 transition-all duration-300">
+            <h3 class="text-3xl md:text-4xl font-bold text-green-500 mb-2">10,000+</h3>
+            <p class="text-gray-400">Active Users</p>
+          </div>
+          <div class="p-6 rounded-xl bg-gray-900 border border-gray-700 hover:border-green-500 transition-all duration-300">
+            <h3 class="text-3xl md:text-4xl font-bold text-green-500 mb-2">99.9%</h3>
+            <p class="text-gray-400">Uptime</p>
+          </div>
+          <div class="p-6 rounded-xl bg-gray-900 border border-gray-700 hover:border-green-500 transition-all duration-300">
+            <h3 class="text-3xl md:text-4xl font-bold text-green-500 mb-2">50+</h3>
+            <p class="text-gray-400">Integrations</p>
+          </div>
+          <div class="p-6 rounded-xl bg-gray-900 border border-gray-700 hover:border-green-500 transition-all duration-300">
+            <h3 class="text-3xl md:text-4xl font-bold text-green-500 mb-2">24/7</h3>
+            <p class="text-gray-400">Support</p>
           </div>
         </div>
       </div>
     </section>
 
     <!-- CTA Section -->
-    <section class="cta">
-      <div class="container">
-        <h2 class="cta-title">Ready to Get Started?</h2>
-        <p class="cta-text">Join thousands of satisfied users today.</p>
+    <section class="py-16 md:py-24 bg-gradient-to-b from-gray-900 to-gray-800">
+      <div class="container mx-auto px-4 text-center">
+        <h2 class="text-3xl md:text-4xl font-bold mb-4 text-white">Ready to Get Started?</h2>
+        <p class="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">Join thousands of satisfied users today.</p>
         <button
-          class="btn btn-primary btn-lg"
+          class="px-8 py-4 rounded-full bg-gradient-to-r from-green-600 to-green-500 text-white font-medium text-lg hover:shadow-lg hover:shadow-green-900/20 transition-all duration-300 transform hover:-translate-y-1"
           @click="navigateTo('/register')"
           aria-label="Create your free account"
         >
@@ -192,546 +333,80 @@ export default defineComponent({
     </section>
 
     <!-- Footer -->
-    <footer class="footer">
-      <div class="container">
-        <div class="footer-content">
-          <div class="footer-brand">
-            <img src="/logo.svg" alt="Logo" class="logo" />
-            <h3 class="company-name">YourApp</h3>
-            <p class="company-description">
-              Making work better since 2023.
-            </p>
+    <footer class="pt-16 pb-8 bg-gray-900 border-t border-gray-800">
+      <div class="container mx-auto px-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+          <div>
+            <div class="flex items-center mb-4">
+              <div class="h-10 w-10 rounded-full bg-gradient-to-r from-green-600 to-green-500 flex items-center justify-center shadow-lg overflow-hidden mr-3">
+                <img
+                  v-if="logoLoaded"
+                  :src="logoUrl"
+                  :alt="logoAlt"
+                  class="h-6 w-auto filter brightness-0 invert"
+                  @error="(e) => handleImageError(e, 'logo')"
+                />
+                <div v-else class="text-white font-bold text-sm">{{ logoFallbackText }}</div>
+              </div>
+              <h3 class="text-xl font-bold text-white">YourApp</h3>
+            </div>
+            <p class="text-gray-400 mb-6">Making work better since 2023.</p>
+            <div class="flex space-x-4">
+              <a href="#" aria-label="Facebook" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-green-500 hover:bg-green-500 hover:text-white transition-colors">
+                <i class="mdi mdi-facebook text-xl"></i>
+              </a>
+              <a href="#" aria-label="Twitter" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-green-500 hover:bg-green-500 hover:text-white transition-colors">
+                <i class="mdi mdi-twitter text-xl"></i>
+              </a>
+              <a href="#" aria-label="LinkedIn" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-green-500 hover:bg-green-500 hover:text-white transition-colors">
+                <i class="mdi mdi-linkedin text-xl"></i>
+              </a>
+              <a href="#" aria-label="Instagram" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-green-500 hover:bg-green-500 hover:text-white transition-colors">
+                <i class="mdi mdi-instagram text-xl"></i>
+              </a>
+            </div>
           </div>
-          <div class="footer-links">
-            <div class="footer-column">
-              <h4 class="footer-heading">Product</h4>
-              <ul>
-                <li><a href="#features">Features</a></li>
-                <li><a href="#pricing">Pricing</a></li>
-                <li><a href="#integrations">Integrations</a></li>
-              </ul>
-            </div>
-            <div class="footer-column">
-              <h4 class="footer-heading">Company</h4>
-              <ul>
-                <li><a href="#about">About Us</a></li>
-                <li><a href="#careers">Careers</a></li>
-                <li><a href="#contact">Contact</a></li>
-              </ul>
-            </div>
-            <div class="footer-column">
-              <h4 class="footer-heading">Resources</h4>
-              <ul>
-                <li><a href="#blog">Blog</a></li>
-                <li><a href="#help">Help Center</a></li>
-                <li><a href="#community">Community</a></li>
-              </ul>
-            </div>
+
+          <div>
+            <h4 class="text-lg font-bold text-white mb-4">Product</h4>
+            <ul class="space-y-2">
+              <li><a href="#features" class="text-gray-400 hover:text-green-500 transition-colors">Features</a></li>
+              <li><a href="#pricing" class="text-gray-400 hover:text-green-500 transition-colors">Pricing</a></li>
+              <li><a href="#integrations" class="text-gray-400 hover:text-green-500 transition-colors">Integrations</a></li>
+              <li><a href="#roadmap" class="text-gray-400 hover:text-green-500 transition-colors">Roadmap</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-lg font-bold text-white mb-4">Company</h4>
+            <ul class="space-y-2">
+              <li><a href="#about" class="text-gray-400 hover:text-green-500 transition-colors">About Us</a></li>
+              <li><a href="#careers" class="text-gray-400 hover:text-green-500 transition-colors">Careers</a></li>
+              <li><a href="#contact" class="text-gray-400 hover:text-green-500 transition-colors">Contact</a></li>
+              <li><a href="#press" class="text-gray-400 hover:text-green-500 transition-colors">Press</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 class="text-lg font-bold text-white mb-4">Resources</h4>
+            <ul class="space-y-2">
+              <li><a href="#blog" class="text-gray-400 hover:text-green-500 transition-colors">Blog</a></li>
+              <li><a href="#help" class="text-gray-400 hover:text-green-500 transition-colors">Help Center</a></li>
+              <li><a href="#community" class="text-gray-400 hover:text-green-500 transition-colors">Community</a></li>
+              <li><a href="#webinars" class="text-gray-400 hover:text-green-500 transition-colors">Webinars</a></li>
+            </ul>
           </div>
         </div>
-        <div class="footer-bottom">
-          <p class="copyright">© 2023 YourApp. All rights reserved.</p>
-          <div class="footer-legal">
-            <a href="/terms">Terms of Service</a>
-            <a href="/privacy">Privacy Policy</a>
+
+        <div class="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">
+          <p class="text-gray-500 mb-4 md:mb-0">© 2023 YourApp. All rights reserved.</p>
+          <div class="flex space-x-6">
+            <a href="/terms" class="text-gray-500 hover:text-green-500 transition-colors">Terms of Service</a>
+            <a href="/privacy" class="text-gray-500 hover:text-green-500 transition-colors">Privacy Policy</a>
+            <a href="/cookies" class="text-gray-500 hover:text-green-500 transition-colors">Cookie Policy</a>
           </div>
         </div>
       </div>
     </footer>
   </div>
 </template>
-
-<style scoped>
-/* Base Styles */
-:root {
-  --primary-color: #4f46e5;
-  --primary-hover: #4338ca;
-  --secondary-color: #f9fafb;
-  --text-color: #1f2937;
-  --text-light: #6b7280;
-  --border-color: #e5e7eb;
-  --white: #ffffff;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --radius: 8px;
-  --transition: all 0.3s ease;
-}
-
-.container {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-}
-
-/* Typography */
-h1, h2, h3, h4, h5, h6 {
-  margin: 0;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--text-color);
-}
-
-p {
-  margin: 0;
-  line-height: 1.6;
-  color: var(--text-light);
-}
-
-/* Buttons */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1.25rem;
-  border-radius: var(--radius);
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition);
-  border: none;
-  outline: none;
-  text-decoration: none;
-}
-
-.btn-primary {
-  background-color: var(--primary-color);
-  color: var(--white);
-}
-
-.btn-primary:hover, .btn-primary:focus {
-  background-color: var(--primary-hover);
-}
-
-.btn-outline {
-  background-color: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-}
-
-.btn-outline:hover, .btn-outline:focus {
-  background-color: var(--secondary-color);
-}
-
-.btn-lg {
-  padding: 0.75rem 1.5rem;
-  font-size: 1.125rem;
-}
-
-/* Navbar */
-.navbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background-color: var(--white);
-  box-shadow: var(--shadow);
-  padding: 1rem 0;
-}
-
-.navbar .container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.navbar-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.logo {
-  height: 2rem;
-  width: auto;
-}
-
-.company-name {
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.navbar-menu {
-  display: flex;
-  align-items: center;
-}
-
-.navbar-end {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-}
-
-.navbar-item {
-  color: var(--text-color);
-  text-decoration: none;
-  font-weight: 500;
-  transition: var(--transition);
-}
-
-.navbar-item:hover {
-  color: var(--primary-color);
-}
-
-.navbar-buttons {
-  display: flex;
-  gap: 0.75rem;
-  margin-left: 1rem;
-}
-
-.menu-toggle {
-  display: none;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-/* Hero Section */
-.hero {
-  padding: 5rem 0;
-  background-color: var(--secondary-color);
-}
-
-.hero .container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  align-items: center;
-}
-
-.hero-title {
-  font-size: 3rem;
-  margin-bottom: 1.5rem;
-}
-
-.hero-subtitle {
-  font-size: 1.25rem;
-  margin-bottom: 2rem;
-}
-
-.hero-buttons {
-  display: flex;
-  gap: 1rem;
-}
-
-.hero-image img {
-  width: 100%;
-  height: auto;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-
-/* Features Section */
-.features {
-  padding: 5rem 0;
-}
-
-.section-title {
-  text-align: center;
-  font-size: 2.25rem;
-  margin-bottom: 3rem;
-}
-
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-}
-
-.feature-card {
-  padding: 2rem;
-  background-color: var(--white);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  transition: var(--transition);
-}
-
-.feature-card:hover {
-  transform: translateY(-5px);
-}
-
-.feature-icon {
-  font-size: 2.5rem;
-  color: var(--primary-color);
-  margin-bottom: 1.25rem;
-}
-
-.feature-title {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-/* Testimonials Section */
-.testimonials {
-  padding: 5rem 0;
-  background-color: var(--secondary-color);
-}
-
-.testimonial-card {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2.5rem;
-  background-color: var(--white);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-
-.testimonial-text {
-  font-size: 1.25rem;
-  font-style: italic;
-  margin-bottom: 2rem;
-}
-
-.testimonial-author {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.testimonial-avatar {
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.testimonial-name {
-  font-size: 1.125rem;
-  margin-bottom: 0.25rem;
-}
-
-/* CTA Section */
-.cta {
-  padding: 5rem 0;
-  text-align: center;
-  background-color: var(--primary-color);
-}
-
-.cta-title {
-  font-size: 2.5rem;
-  color: var(--white);
-  margin-bottom: 1rem;
-}
-
-.cta-text {
-  font-size: 1.25rem;
-  color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 2rem;
-}
-
-.cta .btn-primary {
-  background-color: var(--white);
-  color: var(--primary-color);
-}
-
-.cta .btn-primary:hover {
-  background-color: rgba(255, 255, 255, 0.9);
-}
-
-/* Footer */
-.footer {
-  padding: 5rem 0 2rem;
-  background-color: var(--text-color);
-  color: var(--white);
-}
-
-.footer-content {
-  display: grid;
-  grid-template-columns: 2fr 3fr;
-  gap: 4rem;
-  margin-bottom: 3rem;
-}
-
-.footer-brand .logo {
-  margin-bottom: 1rem;
-}
-
-.company-name {
-  color: var(--white);
-  margin-bottom: 0.75rem;
-}
-
-.company-description {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.footer-links {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-}
-
-.footer-heading {
-  color: var(--white);
-  margin-bottom: 1.25rem;
-  font-size: 1.125rem;
-}
-
-.footer-column ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.footer-column li {
-  margin-bottom: 0.75rem;
-}
-
-.footer-column a {
-  color: rgba(255, 255, 255, 0.7);
-  text-decoration: none;
-  transition: var(--transition);
-}
-
-.footer-column a:hover {
-  color: var(--white);
-}
-
-.footer-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.copyright {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.875rem;
-}
-
-.footer-legal {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.footer-legal a {
-  color: rgba(255, 255, 255, 0.7);
-  text-decoration: none;
-  font-size: 0.875rem;
-  transition: var(--transition);
-}
-
-.footer-legal a:hover {
-  color: var(--white);
-}
-
-/* Responsive Styles */
-@media (max-width: 992px) {
-  .hero .container {
-    grid-template-columns: 1fr;
-  }
-
-  .hero-image {
-    order: -1;
-  }
-
-  .footer-content {
-    grid-template-columns: 1fr;
-    gap: 3rem;
-  }
-}
-
-@media (max-width: 768px) {
-  .menu-toggle {
-    display: block;
-    margin-left: auto;
-  }
-
-  .navbar-menu {
-    position: fixed;
-    top: 4rem;
-    left: 0;
-    right: 0;
-    background-color: var(--white);
-    padding: 1.5rem;
-    box-shadow: var(--shadow);
-    flex-direction: column;
-    align-items: flex-start;
-    transform: translateY(-100%);
-    opacity: 0;
-    visibility: hidden;
-    transition: var(--transition);
-  }
-
-  .navbar-menu.is-active {
-    transform: translateY(0);
-    opacity: 1;
-    visibility: visible;
-  }
-
-  .navbar-end {
-    flex-direction: column;
-    width: 100%;
-  }
-
-  .navbar-buttons {
-    margin-top: 1rem;
-    margin-left: 0;
-    width: 100%;
-  }
-
-  .navbar-buttons .btn {
-    flex: 1;
-  }
-
-  .hero-title {
-    font-size: 2.25rem;
-  }
-
-  .section-title {
-    font-size: 1.875rem;
-  }
-
-  .footer-links {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-  }
-
-  .footer-bottom {
-    flex-direction: column;
-    gap: 1rem;
-    text-align: center;
-  }
-}
-
-/* Menu Toggle Icon Animation */
-.icon {
-  position: relative;
-  width: 24px;
-  height: 20px;
-}
-
-.icon span {
-  position: absolute;
-  height: 2px;
-  width: 100%;
-  background-color: var(--text-color);
-  border-radius: 2px;
-  left: 0;
-  transition: var(--transition);
-}
-
-.icon span:nth-child(1) {
-  top: 0;
-}
-
-.icon span:nth-child(2) {
-  top: 9px;
-}
-
-.icon span:nth-child(3) {
-  top: 18px;
-}
-
-.icon.open span:nth-child(1) {
-  transform: rotate(45deg);
-  top: 9px;
-}
-
-.icon.open span:nth-child(2) {
-  opacity: 0;
-}
-
-.icon.open span:nth-child(3) {
-  transform: rotate(-45deg);
-  top: 9px;
-}
-</style>

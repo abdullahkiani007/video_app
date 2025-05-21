@@ -1,49 +1,50 @@
 <template>
-  <div class="flex flex-col h-full overflow-hidden">
+  <div class="flex flex-col h-full overflow-hidden bg-gray-900">
     <!-- Chat header -->
-    <div class="px-4 py-3 bg-gray-50 border-b flex items-center">
-      <h3 class="font-medium text-gray-800">Chat</h3>
-      <div class="ml-auto text-xs text-gray-500">
+    <div class="px-4 py-3 bg-gray-800 border-b border-gray-700 flex items-center shadow-sm">
+      <h3 class="font-medium text-white">Chat</h3>
+      <div class="ml-auto text-xs text-gray-300 bg-gray-700 px-2 py-1 rounded-full">
         {{ messages.length }} messages
       </div>
     </div>
 
     <!-- Messages area with explicit height constraints -->
     <div
-      class="flex-grow overflow-y-auto p-3 bg-white"
+      class="flex-grow overflow-y-auto p-4 bg-gray-900"
       ref="messagesContainer"
-      style="height: calc(100% - 60px);"
+      style="height: calc(100% - 70px);"
     >
       <div v-if="!messages || messages.length === 0" class="flex items-center justify-center h-full">
-        <div class="text-gray-500 italic text-center">
+        <div class="text-gray-400 italic text-center p-4 bg-gray-800 rounded-lg shadow-sm border border-gray-700">
           No messages yet. Start the conversation!
         </div>
       </div>
 
+      <!-- Messages -->
       <div
         v-for="(message, index) in messages"
         :key="index"
-        class="mb-4 max-w-[85%]"
+        class="mb-4 max-w-[85%] transition-all duration-200"
         :class="[
           message.sender_username === currentUser ? 'ml-auto' : 'mr-auto'
         ]"
       >
         <div class="flex flex-col">
-          <div class="text-xs text-gray-500 mb-1"
+          <div class="text-xs text-gray-400 mb-1 font-medium"
                :class="[message.sender_username === currentUser ? 'text-right' : 'text-left']">
             {{ message.sender_username || 'User' }}
           </div>
           <div
-            class="p-3 rounded-lg"
+            class="p-3 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md"
             :class="[
               message.sender_username === currentUser ?
-              'bg-blue-500 text-white rounded-tr-none' :
-              'bg-gray-100 text-gray-800 rounded-tl-none'
+              'bg-gradient-to-r from-green-600 to-green-500 text-white rounded-tr-none' :
+              'bg-gray-800 text-gray-300 rounded-tl-none border border-gray-700'
             ]"
           >
             <div class="text-sm break-words">{{ message.content || '' }}</div>
           </div>
-          <div class="text-xs text-gray-500 mt-1"
+          <div class="text-xs text-gray-400 mt-1"
                :class="[message.sender_username === currentUser ? 'text-right' : 'text-left']">
             {{ formatTime(message.created_at) }}
           </div>
@@ -51,35 +52,38 @@
       </div>
 
       <!-- Typing indicator -->
-      <div v-if="typingUsers && typingUsers.length > 0" class="text-xs text-gray-500 italic mt-2 ml-2">
-        <span v-if="typingUsers.length === 1">
-          {{ typingUsers[0] }} is typing...
-        </span>
-        <span v-else-if="typingUsers.length === 2">
-          {{ typingUsers[0] }} and {{ typingUsers[1] }} are typing...
-        </span>
-        <span v-else>
-          {{ typingUsers.slice(0, 2).join(', ') }} and {{ typingUsers.length - 2 }} more are typing...
-        </span>
+      <div
+        v-if="typingUsers && typingUsers.length > 0"
+        class="text-xs bg-gray-800 text-gray-300 italic mt-2 ml-2 px-3 py-2 rounded-full inline-block shadow-sm border border-gray-700"
+      >
+        <div class="flex items-center">
+          <div class="typing-dots mr-2">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          {{ formatTypingMessage(typingUsers) }}
+        </div>
       </div>
     </div>
 
     <!-- Message input with fixed height -->
-    <div class="border-t p-2 bg-white" style="height: 60px;">
+    <div class="border-t border-gray-700 p-3 bg-gray-800 shadow-inner" style="height: 70px;">
       <form @submit.prevent="sendMessage" class="flex h-full">
         <input
           v-model="newMessage"
           type="text"
           placeholder="Type a message..."
-          class="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          class="flex-1 border border-gray-600 rounded-l-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-gray-700 text-white placeholder-gray-400"
           maxlength="1000"
+          @keydown.enter="sendMessage"
         />
         <button
           type="submit"
-          class="bg-blue-500 text-white px-4 py-2 rounded-r-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-blue-300"
+          class="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white px-4 py-2 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 transition-colors duration-200 flex items-center justify-center"
           :disabled="!newMessage.trim()"
         >
-          Send
+          <span>Send</span>
         </button>
       </form>
     </div>
@@ -206,6 +210,35 @@ export default {
         console.error('Error formatting timestamp:', error);
         return '';
       }
+    },
+    formatTypingMessage(users) {
+      if (!users || !Array.isArray(users)) {
+        return '';
+      }
+
+      try {
+        // Filter out current user if present
+        const filteredUsers = users.filter(user => user !== this.effectiveCurrentUser);
+
+        if (filteredUsers.length === 0) {
+          return '';
+        } else if (filteredUsers.length === 1) {
+          return `${filteredUsers[0]} is typing...`;
+        } else if (filteredUsers.length === 2) {
+          return `${filteredUsers[0]} and ${filteredUsers[1]} are typing...`;
+        } else if (filteredUsers.length === 3) {
+          return `${filteredUsers[0]}, ${filteredUsers[1]}, and ${filteredUsers[2]} are typing...`;
+        } else if (filteredUsers.length < 10) {
+          // For moderate number of users (4-9), show count
+          return `${filteredUsers.length} people are typing...`;
+        } else {
+          // For large number of users (10+), show "Many people"
+          return `Many people are typing...`;
+        }
+      } catch (error) {
+        console.error('Error formatting typing message:', error);
+        return 'Activity in chat...';
+      }
     }
   }
 }
@@ -224,15 +257,54 @@ export default {
 }
 
 .overflow-y-auto::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #1f2937; /* dark gray to match theme */
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: #888;
+  background: #4b5563; /* medium gray */
   border-radius: 3px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #6b7280; /* lighter gray on hover */
+}
+
+/* Typing indicator animation */
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+}
+
+.typing-dots span {
+  height: 6px;
+  width: 6px;
+  margin: 0 1px;
+  background-color: #9CA3AF;
+  border-radius: 50%;
+  display: inline-block;
+  opacity: 0.7;
+}
+
+.typing-dots span:nth-child(1) {
+  animation: pulse 1s infinite 0.1s;
+}
+
+.typing-dots span:nth-child(2) {
+  animation: pulse 1s infinite 0.3s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation: pulse 1s infinite 0.5s;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
 }
 </style>

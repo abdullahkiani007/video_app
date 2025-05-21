@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from corsheaders.defaults import default_headers
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +27,13 @@ SECRET_KEY = 'django-insecure-hr8380maeyubn47pk0-*h3wszn4g)(vc_-3uz_#uzv-71ydyn=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    "https://fe0c-37-111-189-123.ngrok-free.app",
+
+    '.ngrok-free.app',  # This will allow all ngrok-free.app subdomains
+]
 
 
 # Application definition
@@ -171,5 +179,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
+
+# Add ngrok URL to CORS_ALLOWED_ORIGINS if it's in ALLOWED_HOSTS
+for host in ALLOWED_HOSTS:
+    if 'ngrok-free.app' in host:
+        CORS_ALLOWED_ORIGINS.append(f"https://{host}")
+
 # For development only - remove in production
-CORS_ALLOW_CREDENTIALS = True
+# CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'ngrok-skip-browser-warning',
+]

@@ -264,5 +264,4 @@ export const useAuthStore = defineStore('auth', {
   }
 })
 
-// Call initializeFromStorage when the store is created
-useAuthStore().initializeFromStorage()
+export type AuthStore = ReturnType<typeof useAuthStore>
