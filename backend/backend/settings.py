@@ -30,9 +30,9 @@ DEBUG = True
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
-    "https://fe0c-37-111-189-123.ngrok-free.app",
-
-    '.ngrok-free.app',  # This will allow all ngrok-free.app subdomains
+    'fe0c-37-111-189-123.ngrok-free.app',
+    '984c-37-111-189-123.ngrok-free.app',
+    '192.168.219.80',  # Your local network IP
 ]
 
 
@@ -175,8 +175,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vue dev server
+    "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://192.168.219.80:5173",  # Your local network IP with frontend port
 ]
 
 

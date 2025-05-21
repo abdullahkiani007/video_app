@@ -6,6 +6,44 @@
       Remote streams: {{ Object.keys(validRemoteStreams).join(', ') }}
     </div>
 
+    <!-- Fullscreen video overlay -->
+    <div v-if="fullscreenVideo"
+         class="fixed inset-0 bg-black z-50 flex justify-center items-center"
+         @click="exitFullscreen">
+      <div class="absolute top-4 right-4 z-10">
+        <button @click.stop="exitFullscreen"
+                class="bg-black/60 p-2 rounded-full text-white hover:bg-black/80 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <video v-if="fullscreenVideo.isLocal"
+             ref="fullscreenVideoEl"
+             :srcObject.prop="localStream"
+             autoplay
+             playsinline
+             muted
+             class="w-full h-full object-contain">
+      </video>
+
+      <video v-else
+             ref="fullscreenVideoEl"
+             :srcObject.prop="validRemoteStreams[fullscreenVideo.userId]"
+             autoplay
+             playsinline
+             class="w-full h-full object-contain">
+      </video>
+
+      <div class="absolute bottom-6 left-6 bg-black/60 px-4 py-2 rounded-lg text-white text-base font-medium flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+        {{ fullscreenVideo.isLocal ? 'You' : getUsernameById(fullscreenVideo.userId) }}
+      </div>
+    </div>
+
     <!-- Empty state - no participants -->
     <div v-if="totalParticipants === 0" class="flex justify-center items-center h-full text-gray-400 text-lg">
       <div class="text-center p-8 bg-gray-800/30 rounded-xl max-w-md">
@@ -35,6 +73,12 @@
           </svg>
           You
         </div>
+        <button @click="enterFullscreen(true)"
+                class="absolute top-3 right-3 bg-black/60 p-1.5 rounded-lg text-white hover:bg-black/80 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -42,14 +86,14 @@
     <div v-else-if="totalParticipants === 2 && localStream && Object.keys(validRemoteStreams).length === 1"
          class="absolute inset-0 flex flex-col md:flex-row justify-center items-center gap-2 md:p-4">
       <!-- Local video -->
-      <div class="relative bg-gray-800 w-full h-[calc(100vh-10rem)] ">
+      <div class="relative bg-gray-800 w-full h-[calc(100vh-10rem)] overflow-hidden">
         <video
           ref="localVideo"
           :srcObject.prop="localStream"
           autoplay
           playsinline
           muted
-          class="absolute inset-0 w-full h-full object-contain md:object-cover"
+          class="absolute inset-0 w-full h-full object-cover"
         ></video>
         <div class="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-white text-sm font-medium flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -57,19 +101,25 @@
           </svg>
           You
         </div>
+        <button @click="enterFullscreen(true)"
+                class="absolute top-3 right-3 bg-black/60 p-1.5 rounded-lg text-white hover:bg-black/80 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+          </svg>
+        </button>
       </div>
 
       <!-- Remote video (single participant) -->
       <div
         v-for="(stream, userId) in validRemoteStreams"
         :key="userId"
-        class="relative bg-gray-800 w-full h-[calc(100vh-10rem)] "
+        class="relative bg-gray-800 w-full h-[calc(100vh-10rem)] overflow-hidden"
       >
         <video
           :ref="el => { if (el) remoteVideoRefs[userId] = el }"
           autoplay
           playsinline
-          class="absolute inset-0 w-full h-full object-contain md:object-cover"
+          class="absolute inset-0 w-full h-full object-cover"
         ></video>
         <div class="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-white text-sm font-medium flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -77,51 +127,65 @@
           </svg>
           {{ getUsernameById(userId) }}
         </div>
+        <button @click="enterFullscreen(false, userId)"
+                class="absolute top-3 right-3 bg-black/60 p-1.5 rounded-lg text-white hover:bg-black/80 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+          </svg>
+        </button>
       </div>
     </div>
 
     <!-- Standard grid layout for other cases -->
     <template v-else>
       <!-- Local video -->
-      <div v-if="localStream" class="relative bg-gray-800 rounded-xl overflow-hidden shadow-lg h-auto">
-        <div class="aspect-video">
-          <video
-            ref="localVideo"
-            :srcObject.prop="localStream"
-            autoplay
-            playsinline
-            muted
-            class="w-full h-full object-cover"
-          ></video>
-        </div>
+      <div v-if="localStream" class="relative bg-gray-800 rounded-xl overflow-hidden shadow-lg h-full w-full">
+        <video
+          ref="localVideo"
+          :srcObject.prop="localStream"
+          autoplay
+          playsinline
+          muted
+          class="w-full h-full object-cover"
+        ></video>
         <div class="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-white text-sm font-medium flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
           You
         </div>
+        <button @click="enterFullscreen(true)"
+                class="absolute top-3 right-3 bg-black/60 p-1.5 rounded-lg text-white hover:bg-black/80 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+          </svg>
+        </button>
       </div>
 
       <!-- Remote videos -->
       <div
         v-for="(stream, userId) in validRemoteStreams"
         :key="userId"
-        class="relative bg-gray-800 rounded-xl overflow-hidden shadow-lg h-auto"
+        class="relative bg-gray-800 rounded-xl overflow-hidden shadow-lg h-full w-full"
       >
-        <div class="aspect-video">
-          <video
-            :ref="el => { if (el) remoteVideoRefs[userId] = el }"
-            autoplay
-            playsinline
-            class="w-full h-full object-cover"
-          ></video>
-        </div>
+        <video
+          :ref="el => { if (el) remoteVideoRefs[userId] = el }"
+          autoplay
+          playsinline
+          class="w-full h-full object-cover"
+        ></video>
         <div class="absolute bottom-3 left-3 bg-black/60 px-3 py-1.5 rounded-lg text-white text-sm font-medium flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
           {{ getUsernameById(userId) }}
         </div>
+        <button @click="enterFullscreen(false, userId)"
+                class="absolute top-3 right-3 bg-black/60 p-1.5 rounded-lg text-white hover:bg-black/80 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+          </svg>
+        </button>
       </div>
     </template>
   </div>
@@ -150,7 +214,8 @@ export default {
   },
   data() {
     return {
-      remoteVideoRefs: {}
+      remoteVideoRefs: {},
+      fullscreenVideo: null, // Will store {isLocal: boolean, userId: string} when in fullscreen mode
     };
   },
   computed: {
@@ -252,6 +317,23 @@ export default {
       handler() {
         this.refreshVideoElements();
       }
+    },
+
+    // Watch for fullscreen changes to ensure video plays properly
+    fullscreenVideo(newValue) {
+      if (newValue) {
+        this.$nextTick(() => {
+          const videoEl = this.$refs.fullscreenVideoEl;
+          if (videoEl) {
+            // Ensure video plays when entering fullscreen
+            if (videoEl.paused) {
+              videoEl.play().catch(err => {
+                console.warn('Failed to play fullscreen video:', err);
+              });
+            }
+          }
+        });
+      }
     }
   },
   methods: {
@@ -305,15 +387,65 @@ export default {
           }
         });
       });
+    },
+
+    // Method to enter fullscreen mode
+    enterFullscreen(isLocal, userId = null) {
+      // Prevent body scrolling when in fullscreen
+      document.body.style.overflow = 'hidden';
+
+      this.fullscreenVideo = {
+        isLocal: isLocal,
+        userId: userId
+      };
+
+      // Notify parent component about fullscreen state change
+      this.$emit('fullscreen-change', true);
+    },
+
+    // Method to exit fullscreen mode
+    exitFullscreen() {
+      // Restore body scrolling
+      document.body.style.overflow = '';
+
+      this.fullscreenVideo = null;
+
+      // Notify parent component about fullscreen state change
+      this.$emit('fullscreen-change', false);
+
+      // Ensure videos continue playing after exiting fullscreen
+      this.$nextTick(() => {
+        this.refreshVideoElements();
+      });
+    },
+
+    // Handle keyboard events for fullscreen mode
+    handleKeyDown(event) {
+      // Exit fullscreen when Escape key is pressed
+      if (event.key === 'Escape' && this.fullscreenVideo) {
+        this.exitFullscreen();
+      }
     }
   },
   mounted() {
     // Initial setup of video elements
     this.refreshVideoElements();
+
+    // Add keyboard event listener for Escape key
+    window.addEventListener('keydown', this.handleKeyDown);
   },
   updated() {
     // Refresh video elements after DOM updates
     this.refreshVideoElements();
+  },
+  beforeDestroy() {
+    // Clean up event listeners
+    window.removeEventListener('keydown', this.handleKeyDown);
+
+    // Ensure body scrolling is restored if component is destroyed while in fullscreen
+    if (this.fullscreenVideo) {
+      document.body.style.overflow = '';
+    }
   }
 };
 </script>
