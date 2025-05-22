@@ -47,7 +47,7 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -68,8 +68,8 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            'hosts': [('127.0.0.1', 6379)],  # Use 'redis' as hostname in Docker
-            # 'hosts': [('redis', 6379)],  # Using the service name from docker-compose
+            # 'hosts': [('127.0.0.1', 6379)],  # Use 'redis' as hostname in Docker
+            'hosts': [('redis', 6379)],  # Using the service name from docker-compose
         },
     },
 }

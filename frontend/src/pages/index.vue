@@ -8,12 +8,12 @@ export default defineComponent({
     return {
       isMenuOpen: false,
       logoUrl: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vuejs/vuejs-original.svg',
-      logoAlt: 'YourApp Logo',
+      logoAlt: 'VC Logo',
       heroImageUrl: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
       heroImageAlt: 'Futuristic digital interface',
       testimonialImageUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
       testimonialImageAlt: 'Jane Doe',
-      logoFallbackText: 'YourApp',
+      logoFallbackText: 'VC',
       heroFallbackText: 'Futuristic Interface',
       logoLoaded: true,
       heroLoaded: true,
@@ -496,58 +496,16 @@ export default defineComponent({
                 />
                 <div v-else class="text-white font-bold text-sm">{{ logoFallbackText }}</div>
               </div>
-              <h3 class="text-xl font-bold text-white">YourApp</h3>
+              <h3 class="text-xl font-bold text-white">VC</h3>
             </div>
             <p class="text-gray-400 mb-6">Making work better since 2023.</p>
-            <div class="flex space-x-4">
-              <a href="#" aria-label="Facebook" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-green-500 hover:bg-green-500 hover:text-white transition-colors">
-                <i class="mdi mdi-facebook text-xl"></i>
-              </a>
-              <a href="#" aria-label="Twitter" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-green-500 hover:bg-green-500 hover:text-white transition-colors">
-                <i class="mdi mdi-twitter text-xl"></i>
-              </a>
-              <a href="#" aria-label="LinkedIn" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-green-500 hover:bg-green-500 hover:text-white transition-colors">
-                <i class="mdi mdi-linkedin text-xl"></i>
-              </a>
-              <a href="#" aria-label="Instagram" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-green-500 hover:bg-green-500 hover:text-white transition-colors">
-                <i class="mdi mdi-instagram text-xl"></i>
-              </a>
-            </div>
+
           </div>
 
-          <div>
-            <h4 class="text-lg font-bold text-white mb-4">Product</h4>
-            <ul class="space-y-2">
-              <li><a href="#features" class="text-gray-400 hover:text-green-500 transition-colors">Features</a></li>
-              <li><a href="#pricing" class="text-gray-400 hover:text-green-500 transition-colors">Pricing</a></li>
-              <li><a href="#integrations" class="text-gray-400 hover:text-green-500 transition-colors">Integrations</a></li>
-              <li><a href="#roadmap" class="text-gray-400 hover:text-green-500 transition-colors">Roadmap</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 class="text-lg font-bold text-white mb-4">Company</h4>
-            <ul class="space-y-2">
-              <li><a href="#about" class="text-gray-400 hover:text-green-500 transition-colors">About Us</a></li>
-              <li><a href="#careers" class="text-gray-400 hover:text-green-500 transition-colors">Careers</a></li>
-              <li><a href="#contact" class="text-gray-400 hover:text-green-500 transition-colors">Contact</a></li>
-              <li><a href="#press" class="text-gray-400 hover:text-green-500 transition-colors">Press</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 class="text-lg font-bold text-white mb-4">Resources</h4>
-            <ul class="space-y-2">
-              <li><a href="#blog" class="text-gray-400 hover:text-green-500 transition-colors">Blog</a></li>
-              <li><a href="#help" class="text-gray-400 hover:text-green-500 transition-colors">Help Center</a></li>
-              <li><a href="#community" class="text-gray-400 hover:text-green-500 transition-colors">Community</a></li>
-              <li><a href="#webinars" class="text-gray-400 hover:text-green-500 transition-colors">Webinars</a></li>
-            </ul>
-          </div>
         </div>
 
         <div class="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">
-          <p class="text-gray-500 mb-4 md:mb-0">© 2023 YourApp. All rights reserved.</p>
+          <p class="text-gray-500 mb-4 md:mb-0">© 2023 VC. All rights reserved.</p>
           <div class="flex space-x-6">
             <a href="/terms" class="text-gray-500 hover:text-green-500 transition-colors">Terms of Service</a>
             <a href="/privacy" class="text-gray-500 hover:text-green-500 transition-colors">Privacy Policy</a>

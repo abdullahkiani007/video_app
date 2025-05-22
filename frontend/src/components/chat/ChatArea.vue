@@ -60,9 +60,10 @@
       </div>
 
       <!-- Typing indicator -->
+      <!-- fix it at bottom of the chat area -->
       <div
-        v-if="typingUsers && typingUsers.length > 0"
-        class="text-xs bg-gray-800/90 text-gray-300 italic mt-2 ml-2 px-3 py-2 rounded-full inline-block shadow-sm border border-gray-700"
+      v-if="typingUsers && typingUsers.length > 0"
+        class="text-xs fixed bottom-0 left-0 w-fit bg-gray-800/90 text-gray-300 italic mt-2 ml-2 px-3 py-2 rounded-full inline-block shadow-sm border border-gray-700"
       >
         <div class="flex items-center">
           <div class="typing-dots mr-2">

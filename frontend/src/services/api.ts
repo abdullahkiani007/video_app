@@ -17,7 +17,11 @@ apiClient.interceptors.response.use(
   },
   async error => {
     // Check if error is due to unauthorized access and we have a refresh token
-    if (error.response?.status === 401 && localStorage.getItem('refresh')) {
+    if (error.response?.status === 401) {
+      console.log("error.response ", error.response)
+
+      if (error.response?.data?.code === "token_not_valid" ){
+        console.log("err" , error.response)
       try {
         console.log("refresh token found");
         const refreshToken = localStorage.getItem('refresh');
@@ -42,6 +46,9 @@ apiClient.interceptors.response.use(
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
+    }else{
+      return Promise.reject(error);
+    }
     }
     if (!localStorage.getItem('access') || !localStorage.getItem('refresh')) {
       window.location.href = '/login';

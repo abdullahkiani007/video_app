@@ -39,4 +39,8 @@ export default defineConfig({
   build: {
     sourcemap: false,
   },
+  server: {
+    host: '0.0.0.0',  // This is important for Docker
+    port: 5173
+  },
 })

@@ -246,82 +246,46 @@ export default class CallService {
     try {
       console.log("joining call");
 
-      // Check if we're in Firefox
-      const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-
       let videoStream: MediaStream | null = null;
 
-      if (isFirefox) {
-        // Firefox fallback: use getUserMedia directly
-        try {
-          // Try to get a video stream from the camera
-          videoStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true
-          });
-          console.log("Using camera stream for Firefox");
-        } catch (err) {
-          console.warn('Could not access camera in Firefox:', err);
-          // Create a canvas-based fallback if camera access fails
-          const canvas = document.createElement('canvas');
-          canvas.width = 640;
-          canvas.height = 480;
-          const ctx = canvas.getContext('2d');
+      // Try to get a video stream from the camera for all browsers
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        });
+        console.log("Using camera stream");
+      } catch (err) {
+        console.warn('Could not access camera:', err);
 
-          // Draw a simple placeholder
-          if (ctx) {
-            ctx.fillStyle = '#333333';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = 'white';
-            ctx.font = '24px Arial';
-            ctx.fillText(`${this.username}`, 20, 40);
-            ctx.fillText('Video unavailable', 20, 80);
-          }
+        // Create a canvas-based fallback if camera access fails
+        const canvas = document.createElement('canvas');
+        canvas.width = 640;
+        canvas.height = 480;
+        const ctx = canvas.getContext('2d');
 
-          // Get stream from canvas
-          videoStream = canvas.captureStream(30); // 30 FPS
-
-          // Add audio if possible
-          try {
-            const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            audioStream.getAudioTracks().forEach(track => videoStream?.addTrack(track));
-          } catch (e) {
-            console.warn('Could not add audio to canvas stream:', e);
-          }
-
-          console.log("Using canvas fallback stream for Firefox");
+        // Draw a simple placeholder
+        if (ctx) {
+          ctx.fillStyle = '#333333';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = 'white';
+          ctx.font = '24px Arial';
+          ctx.fillText(`${this.username}`, 20, 40);
+          ctx.fillText('Video unavailable', 20, 80);
         }
-      } else {
-        // Chrome and other browsers: use video file as before
-        const videoElement = document.createElement('video');
-        videoElement.src = 'src/assets/video.webm'; // Adjust path if needed
-        videoElement.loop = true;
-        videoElement.muted = true;
 
-        // Wait for video to be loaded before capturing
-        await new Promise((resolve) => {
-          videoElement.onloadedmetadata = resolve;
-          videoElement.load();
-        });
+        // Get stream from canvas
+        videoStream = canvas.captureStream(30); // 30 FPS
 
-        // Start playing the video (needed for captureStream)
-        await videoElement.play().catch(err => {
-          console.error('Error playing video:', err);
-          throw new Error('Could not play video file');
-        });
-
-        // Capture stream from the video element
-        videoStream = videoElement.captureStream();
-
-        // Add audio track if possible
+        // Add audio if possible
         try {
           const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
           audioStream.getAudioTracks().forEach(track => videoStream?.addTrack(track));
         } catch (e) {
-          console.warn('Could not add audio to video stream:', e);
+          console.warn('Could not add audio to canvas stream:', e);
         }
 
-        console.log("Using video file stream");
+        console.log("Using canvas fallback stream");
       }
 
       this.localStream = videoStream;

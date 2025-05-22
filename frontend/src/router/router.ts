@@ -67,7 +67,7 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   // Set page title if available
   if (to.meta && to.meta.title) {
-    document.title = `${to.meta.title} | Your App Name`
+    document.title = `${to.meta.title} | VC`
   }
 
   // Check for authentication - use a more secure approach
